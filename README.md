@@ -28,6 +28,7 @@
 - 订单服务：yuna-order-service(暂时不做或绕过逻辑直接返回结果,后续再扩展)
 - 商品服务：yuna-product-service
 - 支付服务：yuna-payment-service(暂时不做或绕过逻辑直接返回结果,后续再扩展)
+- 文件服务：yuna-file-service
 - 通知服务：yuna-notification-service
 - 控制台服务：yuna-console-service(系统信息管理后台)
 - API 网关：yuna-gateway
