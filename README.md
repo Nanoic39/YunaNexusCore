@@ -14,6 +14,9 @@
 - 任务调度：Spring Scheduler
 - 邮箱告警：SpringBootStarterMail
 
+## 配置说明
+- 时区：Asia/Shanghai(UTC+8)
+
 ## 模块划分
 ### 通用模块：服务共用部分
 - 核心公共组件：yuna-common-core
