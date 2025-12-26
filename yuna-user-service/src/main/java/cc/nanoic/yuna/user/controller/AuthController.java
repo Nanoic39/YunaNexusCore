@@ -16,7 +16,7 @@ public class AuthController {
     private final AuthService authService;
 
     @PostMapping("/send-code")
-    public R<Void> sendCode(@RequestParam String email) {
+    public R<Void> sendCode(@RequestParam("email") String email) {
         authService.sendEmailVerifyCode(email);
         return R.success(null, "验证码已发送，请注意查收");
     }
