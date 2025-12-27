@@ -6,7 +6,9 @@ import cc.nanoic.yuna.user.entity.User;
 import cc.nanoic.yuna.user.entity.UserInfo;
 import cc.nanoic.yuna.user.mapper.UserInfoMapper;
 import cc.nanoic.yuna.user.mapper.UserMapper;
+import cc.nanoic.yuna.user.model.dto.UserLoginDTO;
 import cc.nanoic.yuna.user.model.dto.UserRegisterDTO;
+import cc.nanoic.yuna.user.model.vo.UserLoginVO;
 import cc.nanoic.yuna.user.service.AuthService;
 import cc.nanoic.yuna.user.service.UserService;
 import cn.hutool.core.lang.UUID;
@@ -69,6 +71,58 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         userInfoMapper.insert(userInfo);
 
         return user.getId();
+    }
+
+    @Override
+    public UserLoginVO login(UserLoginDTO loginDTO) {
+        // 根据用户名或邮箱查询用户
+        User user = getOne(new LambdaQueryWrapper<User>()
+                .eq(User::getUsername, loginDTO.getAccount())
+                .or()
+                .eq(User::getEmail, loginDTO.getAccount()));
+
+        if (user == null) {
+            throw new BusinessException(ResultCode.USER_NOT_EXIST);
+        }
+
+        // 验证密码
+        if (!BCrypt.checkpw(loginDTO.getPassword(), user.getPassword())) {
+            throw new BusinessException(ResultCode.FAILURE, "密码错误");
+        }
+
+        // 检查状态
+        if (user.getStatus() != 1) {
+            throw new BusinessException(ResultCode.FAILURE, "账号已被禁用或注销");
+        }
+
+        return UserLoginVO.builder()
+                .id(user.getId())
+                .username(user.getUsername())
+                .email(user.getEmail())
+                .token("MOCK_TOKEN_" + UUID.fastUUID().toString(true)) // TODO: 集成 JWT
+                .build();
+    }
+
+    @Override
+    public UserLoginVO loginByEmail(String email) {
+        // 查询用户
+        User user = getOne(new LambdaQueryWrapper<User>().eq(User::getEmail, email));
+
+        if (user == null) {
+            throw new BusinessException(ResultCode.USER_NOT_EXIST, "该邮箱尚未注册");
+        }
+
+        // 检查状态
+        if (user.getStatus() != 1) {
+            throw new BusinessException(ResultCode.FAILURE, "账号已被禁用或注销");
+        }
+
+        return UserLoginVO.builder()
+                .id(user.getId())
+                .username(user.getUsername())
+                .email(user.getEmail())
+                .token("MOCK_TOKEN_" + UUID.fastUUID().toString(true)) // TODO: 集成 JWT
+                .build();
     }
     
 }

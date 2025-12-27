@@ -116,7 +116,6 @@ public class AuthServiceImpl implements AuthService {
                             </html>
                             """,
                     code);
-
             helper.setText(htmlContent, true); // true 表示支持 HTML
 
             mailSender.send(mimeMessage);
@@ -144,3 +143,5 @@ public class AuthServiceImpl implements AuthService {
         return false;
     }
 }
+
+// 完整设计说明书+源码+开题报告+中期检查报告+毕业设计论文+PPT+引用到的文献核心讲解+代码核心及想了解的设计原理包教会
