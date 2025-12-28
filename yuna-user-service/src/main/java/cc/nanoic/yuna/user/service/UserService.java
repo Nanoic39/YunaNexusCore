@@ -1,6 +1,7 @@
 package cc.nanoic.yuna.user.service;
 
 import cc.nanoic.yuna.user.entity.User;
+import cc.nanoic.yuna.user.model.dto.UserCodeLoginDTO;
 import cc.nanoic.yuna.user.model.dto.UserLoginDTO;
 import cc.nanoic.yuna.user.model.dto.UserRegisterDTO;
 import cc.nanoic.yuna.user.model.vo.UserLoginVO;
@@ -17,6 +18,7 @@ public interface UserService extends IService<User> {
 
     /**
      * 账号密码登录
+     * 
      * @param loginDTO 登录信息
      * @return 登录结果
      */
@@ -24,8 +26,17 @@ public interface UserService extends IService<User> {
 
     /**
      * 邮箱验证码登录
-     * @param email 邮箱
+     * 
+     * @param loginDTO 登录信息
      * @return 登录结果
      */
-    UserLoginVO loginByEmail(String email);
+    UserLoginVO loginByEmail(UserCodeLoginDTO loginDTO);
+
+    /**
+     * 检查邮箱是否已注册
+     * 
+     * @param email 邮箱
+     * @return true: 已注册, false: 未注册
+     */
+    boolean checkEmail(String email);
 }

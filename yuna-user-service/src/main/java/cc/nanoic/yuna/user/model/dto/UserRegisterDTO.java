@@ -16,7 +16,7 @@ public class UserRegisterDTO {
     private String password;
 
     /**
-     * 确认密码
+     * 邮箱
      */
     private String email;
 
@@ -29,5 +29,10 @@ public class UserRegisterDTO {
      * 昵称（可选，不填则为默认）
      */
     private String nickname;
+
+    /**
+     * 性别（0:未知 1:男 2:女，可选，不填则为未知）
+     */
+    private Integer gender;
 
 }
