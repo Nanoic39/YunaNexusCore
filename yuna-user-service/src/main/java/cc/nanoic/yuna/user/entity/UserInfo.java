@@ -2,6 +2,7 @@ package cc.nanoic.yuna.user.entity;
 
 import java.time.LocalDateTime;
 
+import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 
 import lombok.Data;
@@ -13,6 +14,7 @@ public class UserInfo {
     /**
      * 关联yuna_user的id(一对一,注册时自动创建)
      */
+    @TableId
     private Long user_id;
 
     /**

@@ -1,14 +1,17 @@
 package cc.nanoic.yuna.user.service.impl;
 
 import cc.nanoic.yuna.common.core.exception.BusinessException;
+import cc.nanoic.yuna.common.security.utils.JwtUtil;
 import cc.nanoic.yuna.common.core.result.ResultCode;
 import cc.nanoic.yuna.user.entity.User;
 import cc.nanoic.yuna.user.entity.UserInfo;
 import cc.nanoic.yuna.user.mapper.UserInfoMapper;
 import cc.nanoic.yuna.user.mapper.UserMapper;
 import cc.nanoic.yuna.user.model.dto.UserCodeLoginDTO;
+import cc.nanoic.yuna.user.model.dto.UserDetailDTO;
 import cc.nanoic.yuna.user.model.dto.UserLoginDTO;
 import cc.nanoic.yuna.user.model.dto.UserRegisterDTO;
+import cc.nanoic.yuna.user.model.vo.UserInfoVO;
 import cc.nanoic.yuna.user.model.vo.UserLoginVO;
 import cc.nanoic.yuna.user.service.AuthService;
 import cc.nanoic.yuna.user.service.UserService;
@@ -30,6 +33,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     // 导入
     private final UserInfoMapper userInfoMapper;
     private final AuthService authService;
+    private final JwtUtil jwtUtil;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -45,15 +49,13 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     @Override
     public UserLoginVO login(UserLoginDTO loginDTO) {
         String account = loginDTO.getAccount();
-        User user = null;
+        UserDetailDTO user;
 
         // 根据账号格式判断是邮箱还是用户名
         if (account.contains("@") && account.contains(".")) {
-            // 认为是邮箱
-            user = getOne(new LambdaQueryWrapper<User>().eq(User::getEmail, account));
+            user = baseMapper.selectUserDetailByEmail(account);
         } else {
-            // 认为是用户名
-            user = getOne(new LambdaQueryWrapper<User>().eq(User::getUsername, account));
+            user = baseMapper.selectUserDetailByUsername(account);
         }
 
         if (user == null) {
@@ -70,12 +72,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
             throw new BusinessException(ResultCode.FAILURE, "账号已被禁用或注销");
         }
 
-        return UserLoginVO.builder()
-                .id(user.getId())
-                .username(user.getUsername())
-                .email(user.getEmail())
-                .token("MOCK_TOKEN_" + UUID.fastUUID().toString(true)) // TODO: 集成 JWT
-                .build();
+        return buildUserLoginVO(user);
     }
 
     @Override
@@ -83,7 +80,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     public UserLoginVO loginByEmail(UserCodeLoginDTO loginDTO) {
         String email = loginDTO.getEmail();
         // 查询用户
-        User user = getOne(new LambdaQueryWrapper<User>().eq(User::getEmail, email));
+        UserDetailDTO user = baseMapper.selectUserDetailByEmail(email);
 
         if (user == null) {
             // 未注册，检查是否携带了用户名和密码
@@ -106,7 +103,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
             createUser(registerDTO);
 
             // 重新查询用户以获取完整信息
-            user = getOne(new LambdaQueryWrapper<User>().eq(User::getEmail, email));
+            user = baseMapper.selectUserDetailByEmail(email);
 
         } else {
             // 已注册，校验验证码
@@ -120,12 +117,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
             }
         }
 
-        return UserLoginVO.builder()
-                .id(user.getId())
-                .username(user.getUsername())
-                .email(user.getEmail())
-                .token("MOCK_TOKEN_" + UUID.fastUUID().toString(true)) // TODO: 集成 JWT
-                .build();
+        return buildUserLoginVO(user);
     }
 
     // ========== 方法 ========== //
@@ -142,13 +134,13 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     }
 
     /**
-     * 创建用户逻辑封装
+     * 创建用户/用户注册的逻辑封装
      * 
      * @param registerDTO 注册信息
      * @return 用户ID
      */
     private Long createUser(UserRegisterDTO registerDTO) {
-        // 校验用户名格式（不允许包含@和.）
+        // 校验用户名格式（不允许包含@或.）
         if (StrUtil.containsAny(registerDTO.getUsername(), "@", ".")) {
             throw new BusinessException(ResultCode.FAILURE, "用户名不能包含特殊字符'@'或'.'");
         }
@@ -179,15 +171,46 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         // 创建UserInfo对象
         UserInfo userInfo = new UserInfo();
         userInfo.setUser_id(user.getId());
-        userInfo.setNickname(StrUtil.isBlank(registerDTO.getNickname()) ? "Yuna#" + registerDTO.getUsername()
+        // 未填写昵称时设置为默认格式：Yuna#default_用户名
+        userInfo.setNickname(StrUtil.isBlank(registerDTO.getNickname())
+                ? ("Yuna#default_" + registerDTO.getUsername())
                 : registerDTO.getNickname());
-        userInfo.setGender(registerDTO.getGender() != null ? registerDTO.getGender() : 0); // 0:未知
+        userInfo.setGender(registerDTO.getGender() != null ? registerDTO.getGender() : 0); // 默认0:未知
         userInfo.setExperience(0); // 注册时默认零
         userInfo.setUpdateTime(LocalDateTime.now());
 
         userInfoMapper.insert(userInfo);
 
         return user.getId();
+    }
+
+    private UserLoginVO buildUserLoginVO(UserDetailDTO user) {
+        // 直接从 DTO 获取 UserInfo
+        UserInfo userInfo = user.getUserInfo();
+
+        UserInfoVO userInfoVO;
+        // 处理信息以匹配格式
+        userInfoVO = UserInfoVO.builder()
+                .nickname(userInfo.getNickname())
+                .avatar(null) // TODO: 集成文件存储服务，自动拼接URL
+                .gender(
+                        // 自动转换为字符串
+                        switch (userInfo.getGender()) {
+                            case 1 -> "男";
+                            case 2 -> "女";
+                            default -> "未知";
+                        })
+                .biography(userInfo.getBiography())
+                .experience(userInfo.getExperience())
+                .build();
+
+        return UserLoginVO.builder()
+                .uuid(user.getUuid())
+                .username(user.getUsername())
+                .email(user.getEmail())
+                .token(jwtUtil.generateToken(user.getId(), user.getUsername()))
+                .userInfo(userInfoVO)
+                .build();
     }
 
 }

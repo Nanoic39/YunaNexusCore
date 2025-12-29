@@ -40,5 +40,6 @@
     - YunaNexus-NBLOG
     - YunaNexus-MaiTTx
 
-## 数据库设计
-### 
+## 注意事项
+### 密钥安全
+- 密钥：yuna-common-security 模块中的 JwtProperties 类中的 secret 属性为开发者自己填写的值，由YunaNexusCore\yuna-user-service\src\main\resources\application.yml配置文件中的 yuna.jwt.secret 属性指定，在生产环境中请自行替换为512位的随机字符串。
