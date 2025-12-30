@@ -1,6 +1,5 @@
 package cc.nanoic.yuna.user.model.vo;
 
-import cc.nanoic.yuna.user.entity.UserInfo;
 import lombok.Builder;
 import lombok.Data;
 
@@ -26,6 +25,11 @@ public class UserLoginVO {
      * Token (暂未实现，预留)
      */
     private String token;
+
+    /**
+     * Token刷新令牌
+     */
+    private String refreshToken;
 
     /**
      * 用户信息, 包含用户的基本信息

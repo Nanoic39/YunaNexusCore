@@ -23,29 +23,39 @@ public class JwtUtil {
     private final JwtProperties jwtProperties;
 
     /**
-     * 生成 token
-     * @param userId 用户ID
+     * 生成 AccessToken
+     * 
+     * @param userId   用户ID
      * @param username 用户名
-     * @return token
+     * @return AccessToken
      */
-    public String generateToken(Long userId, String username) {
+    public String generateAccessToken(Long userId, String username) {
         Map<String, Object> claims = new HashMap<>();
         claims.put("userId", userId);
         claims.put("username", username);
-        return generateToken(claims);
+        claims.put("type", "access");
+        return generateToken(claims, jwtProperties.getAccessExpiration());
     }
 
     /**
-     * 生成 token
-     * @param claims 数据声明
-     * @return token
+     * 生成 RefreshToken
+     * 
+     * @param userId   用户ID
+     * @param username 用户名
+     * @return RefreshToken
      */
-    private String generateToken(Map<String, Object> claims) {
-        return Jwts.builder()
-                .setClaims(claims)
-                .setExpiration(generateExpirationDate())
-                .signWith(getSigningKey(), SignatureAlgorithm.HS512)
-                .compact();
+    public String generateRefreshToken(Long userId, String username) {
+        Map<String, Object> claims = new HashMap<>();
+        claims.put("userId", userId);
+        claims.put("username", username);
+        claims.put("type", "refresh");
+        return generateToken(claims, jwtProperties.getRefreshExpiration());
+    }
+
+    public String generateToken(Map<String, Object> claims, long expirationSeconds) {
+        Date expirationDate = new Date(System.currentTimeMillis() + expirationSeconds * 1000);
+        return Jwts.builder().setClaims(claims).setExpiration(expirationDate)
+                .signWith(getSigningKey(), SignatureAlgorithm.HS512).compact();
     }
 
     /**
@@ -108,8 +118,9 @@ public class JwtUtil {
 
     /**
      * 验证 token 是否有效 (包含类型校验)
-     * @param token 令牌
-     * @param username 用户名 (可为null，若为null则不校验用户名)
+     * 
+     * @param token        令牌
+     * @param username     用户名 (可为null，若为null则不校验用户名)
      * @param expectedType 期望的令牌类型 (access / refresh)
      */
     public boolean validateToken(String token, String username, String expectedType) {
@@ -145,15 +156,8 @@ public class JwtUtil {
     }
 
     /**
-     * 生成 token 过期时间
-     * @return 过期时间
-     */
-    private Date generateExpirationDate() {
-        return new Date(System.currentTimeMillis() + jwtProperties.getAccessExpiration() * 1000);
-    }
-
-    /**
      * 从配置中获取签名密钥
+     * 
      * @return 签名密钥
      */
     private Key getSigningKey() {

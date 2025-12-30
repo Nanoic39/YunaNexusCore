@@ -11,6 +11,7 @@ import cc.nanoic.yuna.user.model.dto.UserCodeLoginDTO;
 import cc.nanoic.yuna.user.model.dto.UserDetailDTO;
 import cc.nanoic.yuna.user.model.dto.UserLoginDTO;
 import cc.nanoic.yuna.user.model.dto.UserRegisterDTO;
+import cc.nanoic.yuna.user.model.dto.UserUpdateDTO;
 import cc.nanoic.yuna.user.model.vo.UserInfoVO;
 import cc.nanoic.yuna.user.model.vo.UserLoginVO;
 import cc.nanoic.yuna.user.service.AuthService;
@@ -120,6 +121,86 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         return buildUserLoginVO(user);
     }
 
+    /**
+     * 刷新访问令牌
+     * 
+     * @param refreshToken 刷新令牌
+     * @return 新的登录信息
+     */
+    @Override
+    public UserLoginVO refreshAccessToken(String refreshToken) {
+        // 验证 RefreshToken 是否有效且类型正确
+        if (!jwtUtil.validateToken(refreshToken, null, "refresh")) {
+            throw new BusinessException(ResultCode.UN_AUTHORIZED, "登录状态无效或已过期, 请重新登录");
+        }
+
+        // 获取用户ID
+        Long userId = jwtUtil.getUserIdFromToken(refreshToken);
+        if (userId == null) {
+            throw new BusinessException(ResultCode.UN_AUTHORIZED, "登录状态无效");
+        }
+
+        // 查询用户信息 (确保用户还存在且未被禁用)
+        User user = baseMapper.selectById(userId);
+        if (user == null || user.getStatus() != 1) {
+            throw new BusinessException(ResultCode.USER_NOT_EXIST, "用户不存在或已被禁用");
+        }
+
+        // 查询用户详细信息 (包含UserInfo)
+        UserDetailDTO userDetail = baseMapper.selectUserDetailByUsername(user.getUsername());
+        return buildUserLoginVO(userDetail);
+    }
+
+    /**
+     * 更新用户信息
+     * 
+     * @param userId 用户ID
+     * @param updateDTO 更新信息
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void updateUserInfo(Long userId, UserUpdateDTO updateDTO) {
+        // 获取 UserInfo
+        UserInfo userInfo = userInfoMapper.selectById(userId);
+        // 获取用户信息失败说明出现异常
+        if (userInfo == null) {
+            throw new BusinessException(ResultCode.USER_NOT_EXIST, "用户不存在或已被禁用");
+        }
+
+        boolean changed = false;
+        if (updateDTO.getNickname() != null) {
+            if (StrUtil.isNotBlank(updateDTO.getNickname())) {
+                userInfo.setNickname(updateDTO.getNickname());
+            } else {
+                userInfo.setNickname("Yuna#default");
+            }
+            changed = true;
+        }
+        if (updateDTO.getGender() != null) {
+            userInfo.setGender(updateDTO.getGender());
+            changed = true;
+        }
+        if (updateDTO.getBiography() != null) { // 允许清空简介
+            userInfo.setBiography(updateDTO.getBiography());
+            changed = true;
+        }
+        if(updateDTO.getAvatar() != null) {
+            userInfo.setAvatar_id(updateDTO.getAvatar());
+            changed = true;
+        }
+        if (updateDTO.getBirthday() != null) {
+            userInfo.setBirthday(updateDTO.getBirthday());
+            changed = true;
+        }
+
+        if (changed) {
+            userInfo.setUpdateTime(LocalDateTime.now());
+            userInfoMapper.updateById(userInfo);
+        } else {
+            throw new BusinessException(ResultCode.FAILURE, "未更新任何信息");
+        }
+    }
+
     // ========== 方法 ========== //
 
     /**
@@ -184,7 +265,17 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         return user.getId();
     }
 
+    /**
+     * 构建用户登录VO
+     * 
+     * @param user 用户详情DTO
+     * @return 用户登录VO
+     */
     private UserLoginVO buildUserLoginVO(UserDetailDTO user) {
+        // 生成 AccessToken 和 RefreshToken
+        String accessToken = jwtUtil.generateAccessToken(user.getId(), user.getUsername());
+        String refreshToken = jwtUtil.generateRefreshToken(user.getId(), user.getUsername());
+
         // 直接从 DTO 获取 UserInfo
         UserInfo userInfo = user.getUserInfo();
 
@@ -208,7 +299,8 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
                 .uuid(user.getUuid())
                 .username(user.getUsername())
                 .email(user.getEmail())
-                .token(jwtUtil.generateToken(user.getId(), user.getUsername()))
+                .token(accessToken)
+                .refreshToken(refreshToken)
                 .userInfo(userInfoVO)
                 .build();
     }
