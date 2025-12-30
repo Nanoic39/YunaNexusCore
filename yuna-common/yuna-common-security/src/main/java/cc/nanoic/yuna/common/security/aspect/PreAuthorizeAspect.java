@@ -69,7 +69,7 @@ public class PreAuthorizeAspect {
         }
 
         // 根据条件判断是否满足权限要求
-        Boolean hasPermission = false;
+        boolean hasPermission = false;
         if (logical == RequiresPermissions.Logical.AND) {
             hasPermission = true;
             // 循环判断所有权限是否都满足
@@ -82,7 +82,7 @@ public class PreAuthorizeAspect {
             }
         } else if (logical == RequiresPermissions.Logical.OR) {
             for (String permission : requiredPermissions) {
-                if (userPermissions.contains(hasPermission)) {
+                if (userPermissions.contains(permission)) {
                     // OR条件下只要有一个权限满足，就算条件满足，直接跳出循环
                     hasPermission = true;
                     break;

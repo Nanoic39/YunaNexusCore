@@ -18,7 +18,7 @@ public class CorsProperties {
     /**
      * 是否开启 CORS
      */
-    private Boolean enabled = true;
+    private Boolean enabled = false;
 
     /**
      * 拦截路径
