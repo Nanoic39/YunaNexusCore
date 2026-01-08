@@ -39,7 +39,8 @@ public class AuthGlobalFilter implements GlobalFilter, Ordered {
             "/api/user/auth/register", // 注册接口
             "/api/user/auth/send-code", // 发送验证码接口
             "/api/user/auth/check-email", // 校验邮箱接口
-            "/api/user/auth/refresh" // 刷新token接口
+            "/api/user/auth/refresh", // 刷新token接口
+            "/api/user/auth/validate" // 校验token接口
     );
 
     @Override

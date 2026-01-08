@@ -56,7 +56,7 @@ public class AuthServiceImpl implements AuthService {
 
             // 设置发送人别名 "YunaNexus <email>"
             helper.setFrom(fromEmail, "YunaNexus");
-            helper.setTo(email);
+            helper.setTo(java.util.Objects.requireNonNull(email));
             helper.setSubject("【YunaNexus】欢迎注册 - 您的验证码");
 
             // 构建 HTML 内容

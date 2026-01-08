@@ -7,6 +7,8 @@ import cc.nanoic.yuna.user.model.dto.UserLoginDTO;
 import cc.nanoic.yuna.user.model.vo.UserLoginVO;
 import cc.nanoic.yuna.user.service.AuthService;
 import cc.nanoic.yuna.user.service.UserService;
+import cc.nanoic.yuna.common.security.utils.JwtUtil;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -22,6 +24,7 @@ public class AuthController {
 
     private final AuthService authService;
     private final UserService userService;
+    private final JwtUtil jwtUtil;
 
     /**
      * 注册
@@ -77,5 +80,36 @@ public class AuthController {
     @GetMapping("/check-email")
     public R<Boolean> checkEmail(@RequestParam("email") String email) {
         return R.success(userService.checkEmail(email));
+    }
+
+    /**
+     * 刷新访问令牌
+     * 
+     * @param refreshToken 刷新令牌
+     * @return 新的登录信息
+     */
+    @GetMapping("/refresh")
+    public R<UserLoginVO> refresh(@RequestParam("refreshToken") String refreshToken) {
+        return R.success(userService.refreshAccessToken(refreshToken));
+    }
+
+    /**
+     * 校验当前 AccessToken 是否有效
+     * 
+     */
+    @GetMapping("/validate")
+    public R<Void> validate(HttpServletRequest request) {
+        String auth = request.getHeader("Authorization");
+        if (auth == null || !auth.startsWith("Bearer ")) {
+            return R.fail(cc.nanoic.yuna.common.core.result.ResultCode.UN_AUTHORIZED, "Authorization header missing",
+                    "登录状态失效，请重新登录");
+        }
+
+        String token = auth.substring(7);
+        boolean ok = jwtUtil.validateToken(token, null, "access");
+        if (!ok) {
+            return R.fail(cc.nanoic.yuna.common.core.result.ResultCode.UN_AUTHORIZED, "Token invalid", "登录状态失效，请重新登录");
+        }
+        return R.success();
     }
 }
