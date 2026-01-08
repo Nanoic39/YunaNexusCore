@@ -7,6 +7,8 @@ import cc.nanoic.yuna.user.entity.User;
 import cc.nanoic.yuna.user.entity.UserInfo;
 import cc.nanoic.yuna.user.mapper.UserInfoMapper;
 import cc.nanoic.yuna.user.mapper.UserMapper;
+import cc.nanoic.yuna.user.model.dto.UserChangeEmailDTO;
+import cc.nanoic.yuna.user.model.dto.UserChangePasswordDTO;
 import cc.nanoic.yuna.user.model.dto.UserCodeLoginDTO;
 import cc.nanoic.yuna.user.model.dto.UserDetailDTO;
 import cc.nanoic.yuna.user.model.dto.UserLoginDTO;
@@ -185,7 +187,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
             changed = true;
         }
         if(updateDTO.getAvatar() != null) {
-            userInfo.setAvatar_id(updateDTO.getAvatar());
+            userInfo.setAvatarId(updateDTO.getAvatar());
             changed = true;
         }
         if (updateDTO.getBirthday() != null) {
@@ -199,6 +201,97 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         } else {
             throw new BusinessException(ResultCode.FAILURE, "未更新任何信息");
         }
+    }
+
+    /**
+     * 获取用户详细信息
+     * 
+     * @param userId 用户ID
+     * @return 用户详细信息
+     */
+    @Override
+    public UserDetailDTO getUserDetail(Long userId) {
+        User user = baseMapper.selectById(userId);
+        if (user == null || user.getStatus() != 1) {
+            throw new BusinessException(ResultCode.USER_NOT_EXIST, "用户不存在或已被禁用");
+        }
+        return baseMapper.selectUserDetailByUsername(user.getUsername());
+    }
+
+    /**
+     * 根据UUID获取用户ID
+     * 
+     * @param uuid 用户UUID
+     * @return 用户ID
+     */
+    @Override
+    public Long getUserIdByUuid(String uuid) {
+        User user = baseMapper.selectOne(new LambdaQueryWrapper<User>().eq(User::getUuid, uuid));
+        if (user == null) {
+            throw new BusinessException(ResultCode.USER_NOT_EXIST, "用户不存在");
+        }
+        return user.getId();
+    }
+
+    /**
+     * 修改密码
+     * 
+     * @param userId 用户ID
+     * @param changePasswordDTO 密码修改信息
+     */
+    @Override
+    public void changePassword(Long userId, UserChangePasswordDTO changePasswordDTO) {
+        User user = getById(userId);
+        if (user == null) {
+            throw new BusinessException(ResultCode.USER_NOT_EXIST);
+        }
+
+        if (!BCrypt.checkpw(changePasswordDTO.getOldPassword(), user.getPassword())) {
+            throw new BusinessException("原密码错误");
+        }
+
+        user.setPassword(BCrypt.hashpw(changePasswordDTO.getNewPassword()));
+        updateById(user);
+    }
+
+    /**
+     * 修改邮箱
+     * 
+     * @param userId 用户ID
+     * @param changeEmailDTO 邮箱修改信息
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void changeEmail(Long userId, UserChangeEmailDTO changeEmailDTO) {
+        User user = getById(userId);
+        if (user == null) {
+            throw new BusinessException(ResultCode.USER_NOT_EXIST);
+        }
+
+        // 如果原邮箱存在，验证原邮箱
+        if (StrUtil.isNotBlank(user.getEmail())) {
+            if (StrUtil.isBlank(changeEmailDTO.getOldEmailCode())) {
+                throw new BusinessException("请验证原邮箱");
+            }
+            if (!authService.verifyCode(user.getEmail(), changeEmailDTO.getOldEmailCode())) {
+                throw new BusinessException("原邮箱验证码错误");
+            }
+        }
+
+        // 验证新邮箱
+        String newEmail = changeEmailDTO.getNewEmail();
+        if (StrUtil.isBlank(newEmail)) {
+            throw new BusinessException("新邮箱不能为空");
+        }
+        if (checkEmail(newEmail)) {
+            throw new BusinessException("该邮箱已被占用");
+        }
+        if (!authService.verifyCode(newEmail, changeEmailDTO.getNewEmailCode())) {
+            throw new BusinessException("新邮箱验证码错误");
+        }
+
+        user.setEmail(newEmail);
+        updateById(user);
     }
 
     // ========== 方法 ========== //
@@ -251,7 +344,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
 
         // 创建UserInfo对象
         UserInfo userInfo = new UserInfo();
-        userInfo.setUser_id(user.getId());
+        userInfo.setUserId(user.getId());
         // 未填写昵称时设置为默认格式：Yuna#default_用户名
         userInfo.setNickname(StrUtil.isBlank(registerDTO.getNickname())
                 ? ("Yuna#default_" + registerDTO.getUsername())

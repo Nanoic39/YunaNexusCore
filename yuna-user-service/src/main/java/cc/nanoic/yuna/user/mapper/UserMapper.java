@@ -22,9 +22,9 @@ public interface UserMapper extends BaseMapper<User> {
             "LEFT JOIN user_info ui ON u.id = ui.user_id " +
             "WHERE u.email = #{email}")
     @Results({
-            @Result(column = "ui_user_id", property = "userInfo.user_id"),
+            @Result(column = "ui_user_id", property = "userInfo.userId"),
             @Result(column = "nickname", property = "userInfo.nickname"),
-            @Result(column = "avatar_id", property = "userInfo.avatar_id"),
+            @Result(column = "avatar_id", property = "userInfo.avatarId"),
             @Result(column = "gender", property = "userInfo.gender"),
             @Result(column = "birthday", property = "userInfo.birthday"),
             @Result(column = "biography", property = "userInfo.biography"),
@@ -39,9 +39,9 @@ public interface UserMapper extends BaseMapper<User> {
             "LEFT JOIN user_info ui ON u.id = ui.user_id " +
             "WHERE u.username = #{username}")
     @Results({
-            @Result(column = "ui_user_id", property = "userInfo.user_id"),
+            @Result(column = "ui_user_id", property = "userInfo.userId"),
             @Result(column = "nickname", property = "userInfo.nickname"),
-            @Result(column = "avatar_id", property = "userInfo.avatar_id"),
+            @Result(column = "avatar_id", property = "userInfo.avatarId"),
             @Result(column = "gender", property = "userInfo.gender"),
             @Result(column = "birthday", property = "userInfo.birthday"),
             @Result(column = "biography", property = "userInfo.biography"),

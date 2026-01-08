@@ -1,9 +1,12 @@
 package cc.nanoic.yuna.user.service;
 
 import cc.nanoic.yuna.user.entity.User;
+import cc.nanoic.yuna.user.model.dto.UserChangeEmailDTO;
+import cc.nanoic.yuna.user.model.dto.UserChangePasswordDTO;
 import cc.nanoic.yuna.user.model.dto.UserCodeLoginDTO;
 import cc.nanoic.yuna.user.model.dto.UserLoginDTO;
 import cc.nanoic.yuna.user.model.dto.UserRegisterDTO;
+import cc.nanoic.yuna.user.model.dto.UserDetailDTO;
 import cc.nanoic.yuna.user.model.dto.UserUpdateDTO;
 import cc.nanoic.yuna.user.model.vo.UserLoginVO;
 import com.baomidou.mybatisplus.extension.service.IService;
@@ -56,4 +59,34 @@ public interface UserService extends IService<User> {
      * @param updateDTO 更新信息
      */
     void updateUserInfo(Long userId, UserUpdateDTO updateDTO);
+
+    /**
+     * 获取用户详情
+     * 
+     * @param userId 用户ID
+     * @return 用户详情
+     */
+    UserDetailDTO getUserDetail(Long userId);
+
+    /**
+     * 根据UUID获取用户ID
+     * 
+     * @param uuid 用户UUID
+     * @return 用户ID
+     */
+    Long getUserIdByUuid(String uuid);
+
+    /**
+     * 修改密码
+     * @param userId 用户ID
+     * @param changePasswordDTO 密码修改信息
+     */
+    void changePassword(Long userId, UserChangePasswordDTO changePasswordDTO);
+
+    /**
+     * 修改邮箱
+     * @param userId 用户ID
+     * @param changeEmailDTO 邮箱修改信息
+     */
+    void changeEmail(Long userId, UserChangeEmailDTO changeEmailDTO);
 }

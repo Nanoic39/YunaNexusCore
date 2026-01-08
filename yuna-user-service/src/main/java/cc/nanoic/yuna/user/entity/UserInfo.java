@@ -4,6 +4,7 @@ import java.time.LocalDateTime;
 
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.baomidou.mybatisplus.annotation.TableField;
 
 import lombok.Data;
 
@@ -14,8 +15,8 @@ public class UserInfo {
     /**
      * 关联yuna_user的id(一对一,注册时自动创建)
      */
-    @TableId
-    private Long user_id;
+    @TableId("user_id")
+    private Long userId;
 
     /**
      * 昵称(最长64字符)
@@ -25,7 +26,8 @@ public class UserInfo {
     /**
      * 头像uuid(最长36字符)
      */
-    private String avatar_id;
+    @TableField("avatar_id")
+    private String avatarId;
 
     /**
      * 性别(0:未知,1:男,2:女)

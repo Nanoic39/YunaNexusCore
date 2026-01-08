@@ -40,7 +40,8 @@ public class AuthGlobalFilter implements GlobalFilter, Ordered {
             "/api/user/auth/send-code", // 发送验证码接口
             "/api/user/auth/check-email", // 校验邮箱接口
             "/api/user/auth/refresh", // 刷新token接口
-            "/api/user/auth/validate" // 校验token接口
+            "/api/user/auth/validate", // 校验token接口
+            "/api/user/profile" // 用户信息接口
     );
 
     @Override
@@ -62,34 +63,35 @@ public class AuthGlobalFilter implements GlobalFilter, Ordered {
 
         // 获取 Token
         String token = request.getHeaders().getFirst(jwtProperties.getTokenHeader());
-        if (StrUtil.isBlank(token) || !token.startsWith(jwtProperties.getTokenHead())) {
-            return unauthorized(exchange);
+
+        // 尝试解析 Token
+        if (StrUtil.isNotBlank(token) && token.startsWith(jwtProperties.getTokenHead())) {
+            String authToken = token.substring(jwtProperties.getTokenHead().length());
+
+            // 校验 Token
+            if (jwtUtil.validateToken(authToken, null, "access")) {
+                // 解析用户信息并透传 Header
+                Long userId = jwtUtil.getUserIdFromToken(authToken);
+                String username = jwtUtil.getUsernameFromToken(authToken);
+
+                if (userId != null && username != null) {
+                    ServerHttpRequest newRequest = request.mutate()
+                            .header(SecurityConstants.DETAILS_USER_ID, String.valueOf(userId))
+                            .header(SecurityConstants.DETAILS_USERNAME,
+                                    URLEncoder.encode(username, StandardCharsets.UTF_8))
+                            .build();
+                    return chain.filter(exchange.mutate().request(newRequest).build());
+                }
+            }
+        }
+        // 如果没有 Token 或者 Token 无效，检查是否在白名单
+        for (String ignoreUrl : IGNORE_URLS) {
+            if (pathMatcher.match(ignoreUrl, path)) {
+                return chain.filter(exchange);
+            }
         }
 
-        String authToken = token.substring(jwtProperties.getTokenHead().length());
-
-        // 校验 Token (必须是 access 类型)
-        // 这里 username 传 null，只校验 Token 有效性和类型
-        if (!jwtUtil.validateToken(authToken, null, "access")) {
-            return unauthorized(exchange);
-        }
-
-        // 解析用户信息并透传 Header
-        Long userId = jwtUtil.getUserIdFromToken(authToken);
-        String username = jwtUtil.getUsernameFromToken(authToken);
-
-        if (userId == null || username == null) {
-            return unauthorized(exchange);
-        }
-
-        // 构建新的请求头
-        ServerHttpRequest newRequest = request.mutate()
-                .header(SecurityConstants.DETAILS_USER_ID, String.valueOf(userId))
-                .header(SecurityConstants.DETAILS_USERNAME, URLEncoder.encode(username, StandardCharsets.UTF_8))
-                // TODO: 角色和权限信息也应该从 Token 或 Redis 获取并透传
-                .build();
-
-        return chain.filter(exchange.mutate().request(newRequest).build());
+        return unauthorized(exchange);
     }
 
     /**
