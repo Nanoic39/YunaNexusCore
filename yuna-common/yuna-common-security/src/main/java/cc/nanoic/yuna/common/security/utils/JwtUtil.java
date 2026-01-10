@@ -145,6 +145,18 @@ public class JwtUtil {
     }
 
     /**
+     * 从 token 中获取任意 Claim
+     */
+    public Object getClaimFromToken(String token, String key) {
+        try {
+            Claims claims = getClaimsFromToken(token);
+            return claims.get(key);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    /**
      * 从 token 中获取数据声明
      */
     private Claims getClaimsFromToken(String token) {

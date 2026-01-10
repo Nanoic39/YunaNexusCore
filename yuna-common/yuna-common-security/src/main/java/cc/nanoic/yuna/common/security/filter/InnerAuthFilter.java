@@ -43,7 +43,9 @@ public class InnerAuthFilter implements Filter {
         if (StrUtil.isNotBlank(userId)) {
             SecurityContextHolder.LoginUser loginUser = new SecurityContextHolder.LoginUser();
             loginUser.setUserId(Long.valueOf(userId));
-            loginUser.setUsername(URLDecoder.decode(username, StandardCharsets.UTF_8));
+            if (StrUtil.isNotBlank(username)) {
+                loginUser.setUsername(URLDecoder.decode(username, StandardCharsets.UTF_8));
+            }
             // TODO: 解析角色权限（待完善）
             SecurityContextHolder.set(loginUser);
         } else { // 没有网关Header，尝试直接解析 JWT

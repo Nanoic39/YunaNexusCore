@@ -156,7 +156,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     /**
      * 更新用户信息
      * 
-     * @param userId 用户ID
+     * @param userId    用户ID
      * @param updateDTO 更新信息
      */
     @Override
@@ -186,7 +186,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
             userInfo.setBiography(updateDTO.getBiography());
             changed = true;
         }
-        if(updateDTO.getAvatar() != null) {
+        if (updateDTO.getAvatar() != null) {
             userInfo.setAvatarId(updateDTO.getAvatar());
             changed = true;
         }
@@ -236,7 +236,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     /**
      * 修改密码
      * 
-     * @param userId 用户ID
+     * @param userId            用户ID
      * @param changePasswordDTO 密码修改信息
      */
     @Override
@@ -257,7 +257,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     /**
      * 修改邮箱
      * 
-     * @param userId 用户ID
+     * @param userId         用户ID
      * @param changeEmailDTO 邮箱修改信息
      */
     @Override
@@ -376,7 +376,9 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         // 处理信息以匹配格式
         userInfoVO = UserInfoVO.builder()
                 .nickname(userInfo.getNickname())
-                .avatar(null) // TODO: 集成文件存储服务，自动拼接URL
+                .avatar(StrUtil.isNotBlank(userInfo.getAvatarId())
+                        ? "/file/download/" + userInfo.getAvatarId() + "?inline=true"
+                        : null) // TODO: 集成文件存储服务，自动拼接URL
                 .gender(
                         // 自动转换为字符串
                         switch (userInfo.getGender()) {

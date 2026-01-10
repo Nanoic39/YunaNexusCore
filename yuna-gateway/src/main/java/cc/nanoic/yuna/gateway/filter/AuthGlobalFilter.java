@@ -41,7 +41,8 @@ public class AuthGlobalFilter implements GlobalFilter, Ordered {
             "/api/user/auth/check-email", // 校验邮箱接口
             "/api/user/auth/refresh", // 刷新token接口
             "/api/user/auth/validate", // 校验token接口
-            "/api/user/profile" // 用户信息接口
+            "/api/user/profile", // 用户信息接口
+            "/api/file/share/**" // 分享接口
     );
 
     @Override
@@ -54,33 +55,41 @@ public class AuthGlobalFilter implements GlobalFilter, Ordered {
             return chain.filter(exchange);
         }
 
-        // 对白名单放行
-        for (String ignoreUrl : IGNORE_URLS) {
-            if (pathMatcher.match(ignoreUrl, path)) {
-                return chain.filter(exchange);
+        // 获取 Token
+        String headerToken = request.getHeaders().getFirst(jwtProperties.getTokenHeader());
+        String authToken = null;
+        String tokenType = "access";
+
+        if (StrUtil.isNotBlank(headerToken) && headerToken.startsWith(jwtProperties.getTokenHead())) {
+            authToken = headerToken.substring(jwtProperties.getTokenHead().length());
+        } else if (pathMatcher.match("/api/file/file/download/**", path)) {
+            // 仅针对下载接口尝试从 Query Param 获取
+            String queryToken = request.getQueryParams().getFirst("token");
+            if (StrUtil.isNotBlank(queryToken)) {
+                authToken = queryToken;
+                tokenType = "download";
             }
         }
 
-        // 获取 Token
-        String token = request.getHeaders().getFirst(jwtProperties.getTokenHeader());
-
         // 尝试解析 Token
-        if (StrUtil.isNotBlank(token) && token.startsWith(jwtProperties.getTokenHead())) {
-            String authToken = token.substring(jwtProperties.getTokenHead().length());
-
+        if (StrUtil.isNotBlank(authToken)) {
             // 校验 Token
-            if (jwtUtil.validateToken(authToken, null, "access")) {
+            if (jwtUtil.validateToken(authToken, null, tokenType)) {
                 // 解析用户信息并透传 Header
                 Long userId = jwtUtil.getUserIdFromToken(authToken);
                 String username = jwtUtil.getUsernameFromToken(authToken);
 
-                if (userId != null && username != null) {
-                    ServerHttpRequest newRequest = request.mutate()
-                            .header(SecurityConstants.DETAILS_USER_ID, String.valueOf(userId))
-                            .header(SecurityConstants.DETAILS_USERNAME,
-                                    URLEncoder.encode(username, StandardCharsets.UTF_8))
-                            .build();
-                    return chain.filter(exchange.mutate().request(newRequest).build());
+                // 对于 download token，username 可能为空，但这不影响 ID 传递
+                if (userId != null) {
+                    ServerHttpRequest.Builder requestBuilder = request.mutate()
+                            .header(SecurityConstants.DETAILS_USER_ID, String.valueOf(userId));
+                    
+                    if (username != null) {
+                        requestBuilder.header(SecurityConstants.DETAILS_USERNAME,
+                                URLEncoder.encode(username, StandardCharsets.UTF_8));
+                    }
+                    
+                    return chain.filter(exchange.mutate().request(requestBuilder.build()).build());
                 }
             }
         }

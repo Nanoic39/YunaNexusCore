@@ -36,3 +36,5 @@ build/
 *.yml
 说明文档/
 init/
+
+yuna-file-service/data/files
