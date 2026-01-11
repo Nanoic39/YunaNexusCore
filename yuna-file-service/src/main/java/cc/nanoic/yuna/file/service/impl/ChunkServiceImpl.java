@@ -31,15 +31,16 @@ public class ChunkServiceImpl implements ChunkService {
     private final FileService fileService;
 
     @Override
-    public String initChunkUpload(Long userId, String identifier, String filename, Integer totalChunks, Long totalSize) {
+    public String initChunkUpload(Long userId, String identifier, String filename, Integer totalChunks,
+            Long totalSize) {
         // 生成上传ID
         String uploadId = IdUtil.simpleUUID();
         // 创建临时目录
         String tempPath = getTempPath(uploadId);
         File tempDir = new File(tempPath);
         if (!tempDir.exists() && !tempDir.mkdirs()) {
-             log.error("Failed to create temp directory: {}", tempPath);
-             throw new BusinessException(ResultCode.FAILURE, "初始化上传失败: 无法创建临时目录");
+            log.error("Failed to create temp directory: {}", tempPath);
+            throw new BusinessException(ResultCode.FAILURE, "初始化上传失败: 无法创建临时目录");
         }
         log.info("Initialized chunk upload: uploadId={}, path={}", uploadId, tempDir.getAbsolutePath());
         return uploadId;
@@ -51,13 +52,14 @@ public class ChunkServiceImpl implements ChunkService {
         File tempDir = new File(tempPath);
         if (!tempDir.exists()) {
             log.error("Upload task not found: uploadId={}, path={}", uploadId, tempPath);
-            throw new BusinessException(ResultCode.FAILURE, "上传任务不存在或已过期 (ID: " + uploadId + ", Path: " + tempDir.getAbsolutePath() + ")");
+            throw new BusinessException(ResultCode.FAILURE,
+                    "上传任务不存在或已过期 (ID: " + uploadId + ", Path: " + tempDir.getAbsolutePath() + ")");
         }
-        
+
         // 保存分片
         File chunkFile = new File(tempDir, String.valueOf(chunkNumber));
         try (InputStream in = file.getInputStream();
-             FileOutputStream out = new FileOutputStream(chunkFile)) {
+                FileOutputStream out = new FileOutputStream(chunkFile)) {
             IoUtil.copy(in, out);
         } catch (IOException e) {
             log.error("Failed to upload chunk: {} -> {}", file.getOriginalFilename(), chunkFile.getAbsolutePath(), e);
@@ -86,7 +88,8 @@ public class ChunkServiceImpl implements ChunkService {
         File mergedFile = new File(tempDir, "merged_" + filename);
         try (FileOutputStream out = new FileOutputStream(mergedFile, true)) {
             for (File chunk : chunks) {
-                if (chunk.getName().startsWith("merged_")) continue;
+                if (chunk.getName().startsWith("merged_"))
+                    continue;
                 Files.copy(chunk.toPath(), out);
             }
         } catch (IOException e) {
@@ -95,11 +98,12 @@ public class ChunkServiceImpl implements ChunkService {
 
         // 调用 FileService 保存
         try {
-            FileUploadVO vo = fileService.uploadLocal(userId, mergedFile, filename, folderId == null ? 0 : folderId.intValue());
-            
+            FileUploadVO vo = fileService.uploadLocal(userId, mergedFile, filename,
+                    folderId == null ? 0 : folderId.intValue());
+
             // 清理临时文件
             FileUtil.del(tempDir);
-            
+
             return vo;
         } catch (Exception e) {
             // 合并后的文件如果保存失败，保留以便排查？或者也删除

@@ -16,39 +16,74 @@ public class ShareController {
 
     private final ShareService shareService;
 
+    /**
+     * 创建分享
+     * 
+     * @param userId 用户ID
+     * @param dto    分享创建DTO
+     * @return 分享VO
+     */
     @PostMapping("/create")
     public R<ShareVO> create(@RequestHeader(SecurityConstants.DETAILS_USER_ID) Long userId,
-                             @RequestBody ShareCreateDTO dto) {
+            @RequestBody ShareCreateDTO dto) {
         return R.success(shareService.create(userId, dto));
     }
 
+    /**
+     * 获取用户分享列表
+     * 
+     * @param userId 用户ID
+     * @return 分享VO列表
+     */
     @GetMapping("/my")
     public R<java.util.List<ShareVO>> listMy(@RequestHeader(SecurityConstants.DETAILS_USER_ID) Long userId) {
         return R.success(shareService.listMyShares(userId));
     }
 
+    /**
+     * 获取分享详情
+     * 
+     * @param token 分享令牌
+     * @return 分享VO
+     */
     @GetMapping("/{token:.+}")
     public R<ShareVO> get(@PathVariable("token") String token) {
         return R.success(shareService.get(token));
     }
 
+    /**
+     * 获取分享文件元数据
+     * 
+     * @param token 分享令牌
+     * @param pwd   分享密码（可选）
+     * @return 文件元数据VO
+     */
     @GetMapping("/{token}/meta")
     public R<FileMetaVO> meta(@PathVariable("token") String token,
-                              @RequestParam(value = "pwd", required = false) String pwd) {
+            @RequestParam(value = "pwd", required = false) String pwd) {
         return R.success(shareService.fileMeta(token, pwd));
     }
 
+    /**
+     * 下载分享文件
+     * 
+     * @param token  分享令牌
+     * @param pwd    分享密码（可选）
+     * @param inline 是否内联下载（可选，默认false）
+     * @return 下载文件的 ResponseEntity
+     */
     @GetMapping("/{token}/download")
-    public org.springframework.http.ResponseEntity<org.springframework.core.io.Resource> download(@PathVariable("token") String token,
-                                                                                                  @RequestParam(value = "pwd", required = false) String pwd,
-                                                                                                  @RequestParam(value = "inline", required = false, defaultValue = "false") boolean inline) {
+    public org.springframework.http.ResponseEntity<org.springframework.core.io.Resource> download(
+            @PathVariable("token") String token,
+            @RequestParam(value = "pwd", required = false) String pwd,
+            @RequestParam(value = "inline", required = false, defaultValue = "false") boolean inline) {
         org.springframework.core.io.Resource resource = shareService.download(token, pwd);
         String filename = shareService.downloadOriginalName(token);
         String mimeType = "application/octet-stream";
         try {
-             mimeType = shareService.downloadMimeType(token);
+            mimeType = shareService.downloadMimeType(token);
         } catch (Exception e) {
-             // ignore
+            // ignore
         }
 
         try {
@@ -61,28 +96,51 @@ public class ShareController {
 
         return org.springframework.http.ResponseEntity.ok()
                 .contentType(org.springframework.http.MediaType.parseMediaType(mimeType))
-                .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION, dispositionType + "; filename*=UTF-8''" + filename)
+                .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION,
+                        dispositionType + "; filename*=UTF-8''" + filename)
                 .body(resource);
     }
 
+    /**
+     * 取消分享
+     * 
+     * @param userId   用户ID
+     * @param fileUuid 文件UUID
+     * @return 无
+     */
     @PostMapping("/cancel/{fileUuid}")
     public R<Void> cancel(@RequestHeader(SecurityConstants.DETAILS_USER_ID) Long userId,
-                          @PathVariable("fileUuid") String fileUuid) {
+            @PathVariable("fileUuid") String fileUuid) {
         shareService.cancel(userId, fileUuid);
         return R.success(null, "取消分享成功");
     }
 
+    /**
+     * 删除分享
+     * 
+     * @param userId 用户ID
+     * @param token  分享令牌
+     * @return 无
+     */
     @PostMapping("/delete/{token}")
     public R<Void> delete(@RequestHeader(SecurityConstants.DETAILS_USER_ID) Long userId,
-                          @PathVariable("token") String token) {
+            @PathVariable("token") String token) {
         shareService.delete(userId, token);
         return R.success(null, "删除分享成功");
     }
 
+    /**
+     * 更新分享状态
+     * 
+     * @param userId 用户ID
+     * @param token  分享令牌
+     * @param status 分享状态（0：禁用，1：启用）
+     * @return 无
+     */
     @PostMapping("/update-status")
     public R<Void> updateStatus(@RequestHeader(SecurityConstants.DETAILS_USER_ID) Long userId,
-                                @RequestParam("token") String token,
-                                @RequestParam("status") Integer status) {
+            @RequestParam("token") String token,
+            @RequestParam("status") Integer status) {
         shareService.updateStatus(userId, token, status);
         return R.success(null, "状态更新成功");
     }

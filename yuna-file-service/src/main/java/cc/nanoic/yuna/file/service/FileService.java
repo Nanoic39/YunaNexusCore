@@ -35,4 +35,10 @@ public interface FileService {
     Long validateDownloadToken(String uuid, String token);
 
     List<FileMetaVO> my(Long userId, int limit);
+
+    List<FileMetaVO> recycleBin(Long userId, int limit);
+
+    void recover(String uuid, Long userId);
+
+    void clean(String uuid, Long userId);
 }

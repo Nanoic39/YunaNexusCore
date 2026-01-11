@@ -70,22 +70,16 @@ public class ShareServiceImpl implements ShareService {
         s.setShareToken(token);
         String pwd = dto.getSharePwd();
         s.setSharePwd(StrUtil.isBlank(pwd) ? null : pwd);
-        // Default permission: 1 (Download allowed)
-        // If file is text/doc, user might want to set bit 1 (Edit allowed) -> 3 (1 | 2)
-        // Frontend sends permissionType as integer mask
         s.setPermissionType(dto.getPermissionType() == null ? 1 : dto.getPermissionType());
         s.setDownloadLimit(dto.getDownloadLimit() == null ? 0 : dto.getDownloadLimit());
         s.setDownloadCount(0);
         
-        // Fix expire time calculation: if expireSeconds is 0 or null, it means forever (null in DB)
-        // But if frontend sends 0 meaning forever, we should keep it null.
-        // If frontend sends > 0, we calculate.
         if (dto.getExpireSeconds() != null && dto.getExpireSeconds() > 0) {
             s.setExpireTime(LocalDateTime.now().plusSeconds(dto.getExpireSeconds()));
         } else {
             s.setExpireTime(null);
         }
-        
+
         s.setStatus(0); // 0: Active
         s.setCreateBy(userId);
 
@@ -201,7 +195,8 @@ public class ShareServiceImpl implements ShareService {
     private YunaFile getFileByUuid(String uuid) {
         try {
             FileUuidCodec.Locate loc = uuidCodec.decode(uuid);
-            if (loc.shard() == null) return null;
+            if (loc.shard() == null)
+                return null;
             String table = UserFileTableUtil.userFileTable(loc.shard());
             return shardMapper.selectByUuid(table, uuid);
         } catch (Exception e) {
@@ -257,11 +252,11 @@ public class ShareServiceImpl implements ShareService {
                 .eq(YunaFileShare::getFileUuid, fileUuid)
                 .eq(YunaFileShare::getStatus, 0) // Only cancel active shares
                 .last("limit 1"));
-        
+
         if (s == null) {
             throw new BusinessException(ResultCode.NOT_FOUND, "未找到有效分享");
         }
-        
+
         s.setStatus(2); // 2: Invalid/Cancelled
         shareMapper.updateById(s);
     }
@@ -271,15 +266,15 @@ public class ShareServiceImpl implements ShareService {
     public void delete(Long userId, String token) {
         YunaFileShare s = shareMapper.selectOne(new LambdaQueryWrapper<YunaFileShare>()
                 .eq(YunaFileShare::getShareToken, token));
-        
+
         if (s == null) {
             throw new BusinessException(ResultCode.NOT_FOUND, "分享不存在");
         }
-        
+
         if (!Objects.equals(s.getUserId(), userId)) {
             throw new BusinessException(ResultCode.UN_AUTHORIZED, "无权操作");
         }
-        
+
         shareMapper.deleteById(s.getId());
     }
 
@@ -291,15 +286,15 @@ public class ShareServiceImpl implements ShareService {
         }
         YunaFileShare s = shareMapper.selectOne(new LambdaQueryWrapper<YunaFileShare>()
                 .eq(YunaFileShare::getShareToken, token));
-        
+
         if (s == null) {
             throw new BusinessException(ResultCode.NOT_FOUND, "分享不存在");
         }
-        
+
         if (!Objects.equals(s.getUserId(), userId)) {
             throw new BusinessException(ResultCode.UN_AUTHORIZED, "无权操作");
         }
-        
+
         s.setStatus(status);
         shareMapper.updateById(s);
     }
@@ -309,7 +304,7 @@ public class ShareServiceImpl implements ShareService {
         java.util.List<YunaFileShare> list = shareMapper.selectList(new LambdaQueryWrapper<YunaFileShare>()
                 .eq(YunaFileShare::getUserId, userId)
                 .orderByDesc(YunaFileShare::getCreateTime));
-        
+
         return list.stream().map(s -> {
             ShareVO vo = new ShareVO();
             vo.setShareToken(s.getShareToken());
@@ -320,7 +315,7 @@ public class ShareServiceImpl implements ShareService {
             vo.setExpireTime(s.getExpireTime());
             vo.setNeedPwd(StrUtil.isNotBlank(s.getSharePwd()));
             vo.setStatus(s.getStatus());
-            
+
             YunaFile f = getFileByUuid(s.getFileUuid());
             if (f != null) {
                 vo.setFileName(f.getOriginName());

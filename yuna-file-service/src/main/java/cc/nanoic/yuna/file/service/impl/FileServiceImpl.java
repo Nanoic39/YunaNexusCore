@@ -151,7 +151,7 @@ public class FileServiceImpl implements FileService {
 
         String uuid = uuidCodec.nextUserFileUuid(userId);
         fileName = sanitizeName(fileName);
-        
+
         String mimeType = cn.hutool.core.io.FileUtil.getMimeType(fileName);
         String fileType = ext(fileName);
 
@@ -218,8 +218,9 @@ public class FileServiceImpl implements FileService {
                 }
             } catch (BusinessException be) {
                 try {
-                     Files.deleteIfExists(file.toPath());
-                } catch (Exception ignore) {}
+                    Files.deleteIfExists(file.toPath());
+                } catch (Exception ignore) {
+                }
                 throw be;
             } catch (Exception ex) {
                 try {
@@ -293,14 +294,10 @@ public class FileServiceImpl implements FileService {
     @Override
     public void delete(String fileUuid, Long userId) {
         YunaFile e = getAndCheckAccess(fileUuid, userId, false);
-        // Logic to move to recycle bin or delete physically
-        // For now, just mark as deleted or delete physically
-        // Since requirement says "30 days recover", we should mark status.
-        // But for simplicity in this turn, let's just delete the record or mark status -1.
-        // The doc says "status 0" is normal. Let's set status = -1 (deleted).
-        e.setStatus(-1);
+        // The doc says "status 0" is normal. Set status = 1 (Recycle Bin).
+        e.setStatus(1);
         String table = UserFileTableUtil.userFileTable(uuidCodec.shardOfUserId(userId));
-        shardMapper.updateStatus(table, fileUuid, userId, -1, userId);
+        shardMapper.updateStatus(table, fileUuid, userId, 1, userId);
     }
 
     @Override
@@ -310,14 +307,12 @@ public class FileServiceImpl implements FileService {
         }
         YunaFile e = getAndCheckAccess(fileUuid, userId, false);
         String table = UserFileTableUtil.userFileTable(uuidCodec.shardOfUserId(userId));
-        
+
         // Update originName
         e.setOriginName(newName);
         // Also update fileName if needed, but originName is the display name
         shardMapper.updateName(table, fileUuid, newName);
     }
-
-
 
     @Override
     public void createFolder(String name, Long parentId, Long userId) {
@@ -337,16 +332,16 @@ public class FileServiceImpl implements FileService {
         e.setUpdateTime(LocalDateTime.now());
         e.setFileSize(0L);
         e.setStorageType(0);
-        
+
         String table = UserFileTableUtil.userFileTable(uuidCodec.shardOfUserId(userId));
         shardMapper.insertOne(table, e);
     }
 
     @Override
     public void move(String uuid, Long targetFolderId, Long userId) {
-         getAndCheckAccess(uuid, userId, false);
-         String table = UserFileTableUtil.userFileTable(uuidCodec.shardOfUserId(userId));
-         shardMapper.updateFolderId(table, uuid, userId, targetFolderId == null ? 0L : targetFolderId);
+        getAndCheckAccess(uuid, userId, false);
+        String table = UserFileTableUtil.userFileTable(uuidCodec.shardOfUserId(userId));
+        shardMapper.updateFolderId(table, uuid, userId, targetFolderId == null ? 0L : targetFolderId);
     }
 
     @Override
@@ -389,7 +384,8 @@ public class FileServiceImpl implements FileService {
 
     @Override
     public Long validateDownloadToken(String uuid, String token) {
-        if (StrUtil.isBlank(token)) return null;
+        if (StrUtil.isBlank(token))
+            return null;
         try {
             // 校验是否有效且类型为 download
             if (!jwtUtil.validateToken(token, null, "download")) {
@@ -415,6 +411,55 @@ public class FileServiceImpl implements FileService {
         int shard = uuidCodec.shardOfUserId(userId);
         String table = UserFileTableUtil.userFileTable(shard);
         return shardMapper.listByUser(table, userId, safe).stream().map(this::toMetaVO).toList();
+    }
+
+    @Override
+    public List<FileMetaVO> recycleBin(Long userId, int limit) {
+        if (userId == null) {
+            throw new BusinessException("未登录或Token失效");
+        }
+        int safe = Math.max(1, Math.min(limit, 200));
+        int shard = uuidCodec.shardOfUserId(userId);
+        String table = UserFileTableUtil.userFileTable(shard);
+        return shardMapper.selectRecycleBin(table, userId, safe).stream().map(this::toMetaVO).toList();
+    }
+
+    @Override
+    public void recover(String uuid, Long userId) {
+        YunaFile e = getInRecycleBin(uuid, userId);
+        String table = UserFileTableUtil.userFileTable(uuidCodec.shardOfUserId(userId));
+        shardMapper.updateStatus(table, uuid, userId, 0, userId);
+    }
+
+    @Override
+    public void clean(String uuid, Long userId) {
+        YunaFile e = getInRecycleBin(uuid, userId);
+        String table = UserFileTableUtil.userFileTable(uuidCodec.shardOfUserId(userId));
+        // User manual delete -> Status 2 (Hidden/Admin only) per policy requirement to
+        // keep for 180 days
+        shardMapper.updateStatus(table, uuid, userId, 2, userId);
+    }
+
+    private YunaFile getInRecycleBin(String fileUuid, Long userId) {
+        if (StrUtil.isBlank(fileUuid)) {
+            throw new BusinessException(ResultCode.FAILURE, "缺少文件UUID");
+        }
+        FileUuidCodec.Locate loc = uuidCodec.decode(fileUuid);
+        if (loc.shard() == null) {
+            throw new BusinessException(ResultCode.FAILURE, "不支持该类型资源");
+        }
+        String table = UserFileTableUtil.userFileTable(loc.shard());
+        YunaFile e = shardMapper.selectByUuid(table, fileUuid);
+        if (e == null || e.getStatus() != 1) {
+            throw new BusinessException(ResultCode.NOT_FOUND, "文件不存在或不在回收站");
+        }
+        if (userId == null) {
+            throw new BusinessException("未登录或Token失效");
+        }
+        if (!Objects.equals(e.getUserId(), userId)) {
+            throw new BusinessException(ResultCode.UN_AUTHORIZED, "无权访问该文件");
+        }
+        return e;
     }
 
     private YunaFile getAndCheckAccess(String fileUuid, Long userId, boolean allowPublicCategory) {
@@ -461,7 +506,7 @@ public class FileServiceImpl implements FileService {
     private void checkDuplicate(String table, String identifier, String fileName) {
         // Check if file with same identifier exists in this shard
         YunaFile exists = shardMapper.selectByIdentifier(table, identifier);
-        
+
         if (exists != null) {
             throw new BusinessException(ResultCode.FAILURE, "文件已存在: " + exists.getOriginName());
         }
@@ -491,9 +536,11 @@ public class FileServiceImpl implements FileService {
     }
 
     private String ext(String name) {
-        if (name == null) return null;
+        if (name == null)
+            return null;
         int i = name.lastIndexOf('.');
-        if (i < 0 || i == name.length() - 1) return null;
+        if (i < 0 || i == name.length() - 1)
+            return null;
         String e = name.substring(i + 1);
         if (e.length() > 50) {
             e = e.substring(0, 50);
