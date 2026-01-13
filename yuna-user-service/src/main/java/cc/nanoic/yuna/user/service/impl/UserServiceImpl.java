@@ -72,6 +72,12 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         return createUser(registerDTO);
     }
 
+    /**
+     * 用户登录
+     *
+     * @param loginDTO 登录DTO
+     * @return 用户登录VO
+     */
     @Override
     public UserLoginVO login(UserLoginDTO loginDTO) {
         String account = loginDTO.getAccount();
@@ -95,7 +101,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
 
         // 检查状态
         if (user.getStatus() != 1) {
-            throw new BusinessException(ResultCode.FAILURE, "账号已被禁用或注销");
+            throw new BusinessException(ResultCode.FAILURE, "账号已被禁用或冻结");
         }
 
         return buildUserLoginVO(user);
@@ -335,7 +341,8 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
 
     @Override
     public List<RoleVO> getUserRoles(Long userId) {
-        List<UserRole> userRoles = userRoleMapper.selectList(new LambdaQueryWrapper<UserRole>().eq(UserRole::getUserId, userId));
+        List<UserRole> userRoles = userRoleMapper
+                .selectList(new LambdaQueryWrapper<UserRole>().eq(UserRole::getUserId, userId));
         if (userRoles.isEmpty()) {
             return new ArrayList<>();
         }
@@ -352,10 +359,13 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     public List<PermissionVO> getUserPermissions(Long userId) {
         Set<Long> permissionIds = new HashSet<>();
 
-        List<UserPermission> userPermissions = userPermissionMapper.selectList(new LambdaQueryWrapper<UserPermission>().eq(UserPermission::getUserId, userId));
-        permissionIds.addAll(userPermissions.stream().map(UserPermission::getPermissionId).collect(Collectors.toList()));
+        List<UserPermission> userPermissions = userPermissionMapper
+                .selectList(new LambdaQueryWrapper<UserPermission>().eq(UserPermission::getUserId, userId));
+        permissionIds
+                .addAll(userPermissions.stream().map(UserPermission::getPermissionId).collect(Collectors.toList()));
 
-        List<UserRole> userRoles = userRoleMapper.selectList(new LambdaQueryWrapper<UserRole>().eq(UserRole::getUserId, userId));
+        List<UserRole> userRoles = userRoleMapper
+                .selectList(new LambdaQueryWrapper<UserRole>().eq(UserRole::getUserId, userId));
         if (!userRoles.isEmpty()) {
             List<Long> roleIds = userRoles.stream().map(UserRole::getRoleId).collect(Collectors.toList());
             List<Role> roles = roleMapper.selectBatchIds(roleIds);
@@ -369,8 +379,10 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
                 list.add(wildcard);
                 return list;
             }
-            List<RolePermission> rolePermissions = rolePermissionMapper.selectList(new LambdaQueryWrapper<RolePermission>().in(RolePermission::getRoleId, roleIds));
-            permissionIds.addAll(rolePermissions.stream().map(RolePermission::getPermissionId).collect(Collectors.toList()));
+            List<RolePermission> rolePermissions = rolePermissionMapper
+                    .selectList(new LambdaQueryWrapper<RolePermission>().in(RolePermission::getRoleId, roleIds));
+            permissionIds
+                    .addAll(rolePermissions.stream().map(RolePermission::getPermissionId).collect(Collectors.toList()));
         }
 
         if (permissionIds.isEmpty()) {
@@ -414,6 +426,31 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         user.setStatus(status);
         updateById(user);
     }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void deleteUsers(List<Long> userIds) {
+        if (userIds == null || userIds.isEmpty()) {
+            throw new BusinessException(ResultCode.FAILURE, "未选择任何用户");
+        }
+        // 删除用户相关关联数据
+        userRoleMapper.delete(new LambdaQueryWrapper<UserRole>().in(UserRole::getUserId, userIds));
+        userPermissionMapper.delete(new LambdaQueryWrapper<UserPermission>().in(UserPermission::getUserId, userIds));
+        userInfoMapper.delete(new LambdaQueryWrapper<UserInfo>().in(UserInfo::getUserId, userIds));
+        // 删除用户
+        baseMapper.deleteBatchIds(userIds);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void resetUsername(Long userId) {
+        User user = getById(userId);
+        if (user == null) {
+            throw new BusinessException(ResultCode.USER_NOT_EXIST, "用户不存在");
+        }
+        user.setUsername("yuna#CensoredWordName");
+        updateById(user);
+    }
     // ========== 方法 ========== //
 
     /**
@@ -429,10 +466,13 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
 
     @Override
     public boolean isSuperAdmin(Long userId) {
-        List<UserRole> userRoles = userRoleMapper.selectList(new LambdaQueryWrapper<UserRole>().eq(UserRole::getUserId, userId));
-        if (userRoles == null || userRoles.isEmpty()) return false;
+        List<UserRole> userRoles = userRoleMapper
+                .selectList(new LambdaQueryWrapper<UserRole>().eq(UserRole::getUserId, userId));
+        if (userRoles == null || userRoles.isEmpty())
+            return false;
         List<Long> roleIds = userRoles.stream().map(UserRole::getRoleId).collect(Collectors.toList());
-        if (roleIds.isEmpty()) return false;
+        if (roleIds.isEmpty())
+            return false;
         List<Role> roles = roleMapper.selectBatchIds(roleIds);
         return roles.stream().anyMatch(r -> "super_admin".equals(r.getRoleCode()));
     }

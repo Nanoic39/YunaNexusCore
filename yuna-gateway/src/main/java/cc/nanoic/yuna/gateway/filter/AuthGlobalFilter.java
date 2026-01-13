@@ -42,6 +42,8 @@ public class AuthGlobalFilter implements GlobalFilter, Ordered {
             "/api/user/auth/refresh", // 刷新token接口
             "/api/user/auth/validate", // 校验token接口
             "/api/user/profile", // 用户信息接口
+            "/api/user/appeal", // 申诉提交接口（允许未登录）
+            "/api/user/appeal/query", // 申诉查询接口（允许未登录）
             "/api/file/share/**" // 分享接口
     );
 
@@ -83,12 +85,12 @@ public class AuthGlobalFilter implements GlobalFilter, Ordered {
                 if (userId != null) {
                     ServerHttpRequest.Builder requestBuilder = request.mutate()
                             .header(SecurityConstants.DETAILS_USER_ID, String.valueOf(userId));
-                    
+
                     if (username != null) {
                         requestBuilder.header(SecurityConstants.DETAILS_USERNAME,
                                 URLEncoder.encode(username, StandardCharsets.UTF_8));
                     }
-                    
+
                     return chain.filter(exchange.mutate().request(requestBuilder.build()).build());
                 }
             }

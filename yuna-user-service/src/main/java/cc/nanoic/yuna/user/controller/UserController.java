@@ -206,6 +206,99 @@ public class UserController {
     }
 
     /**
+     * 批量封禁
+     */
+    @PostMapping("/ban/batch")
+    @RequiresPermissions("sys:user:ban")
+    public R<Void> banUsersBatch(@RequestHeader(SecurityConstants.DETAILS_USER_ID) Long operatorId,
+            @RequestBody List<Long> ids) {
+        if (ids == null || ids.isEmpty()) {
+            throw new BusinessException(ResultCode.FAILURE, "未选择任何用户");
+        }
+        for (Long id : ids) {
+            if (operatorId != null && operatorId.equals(id)) {
+                continue;
+            }
+            boolean targetIsSuper = userService.isSuperAdmin(id);
+            boolean operatorIsSuper = userService.isSuperAdmin(operatorId);
+            if (targetIsSuper && !operatorIsSuper) {
+                continue;
+            }
+            userService.updateStatus(id, 2);
+            banRecordService.recordBan(id, operatorId, null, null, null, "批量封禁");
+        }
+        return R.success(null, "批量封禁完成");
+    }
+
+    /**
+     * 批量解封
+     */
+    @PostMapping("/unban/batch")
+    @RequiresPermissions("sys:user:unban")
+    public R<Void> unbanUsersBatch(@RequestHeader(SecurityConstants.DETAILS_USER_ID) Long operatorId,
+            @RequestBody List<Long> ids) {
+        if (ids == null || ids.isEmpty()) {
+            throw new BusinessException(ResultCode.FAILURE, "未选择任何用户");
+        }
+        for (Long id : ids) {
+            if (operatorId != null && operatorId.equals(id)) {
+                continue;
+            }
+            boolean targetIsSuper = userService.isSuperAdmin(id);
+            boolean operatorIsSuper = userService.isSuperAdmin(operatorId);
+            if (targetIsSuper && !operatorIsSuper) {
+                continue;
+            }
+            userService.updateStatus(id, 1);
+            banRecordService.closeOpenBans(id, operatorId);
+        }
+        return R.success(null, "批量解封完成");
+    }
+
+    /**
+     * 批量删除账号
+     */
+    @DeleteMapping("/batch")
+    @RequiresPermissions("sys:user:delete")
+    public R<Void> deleteUsersBatch(@RequestHeader(SecurityConstants.DETAILS_USER_ID) Long operatorId,
+            @RequestBody List<Long> ids) {
+        if (ids == null || ids.isEmpty()) {
+            throw new BusinessException(ResultCode.FAILURE, "未选择任何用户");
+        }
+        for (Long id : ids) {
+            if (operatorId != null && operatorId.equals(id)) {
+                throw new BusinessException(ResultCode.UN_AUTHORIZED, "禁止删除自身账号");
+            }
+            boolean targetIsSuper = userService.isSuperAdmin(id);
+            boolean operatorIsSuper = userService.isSuperAdmin(operatorId);
+            if (targetIsSuper && !operatorIsSuper) {
+                throw new BusinessException(ResultCode.UN_AUTHORIZED, "无权删除超级管理员账号");
+            }
+        }
+        userService.deleteUsers(ids);
+        return R.success(null, "批量删除完成");
+    }
+
+    /**
+     * 管理员重置用户名
+     */
+    @PostMapping("/{id}/username/reset")
+    @RequiresPermissions("sys:user:update")
+    public R<Void> resetUsername(@RequestHeader(SecurityConstants.DETAILS_USER_ID) Long operatorId,
+            @PathVariable("id") Long id) {
+        if (operatorId != null && operatorId.equals(id)) {
+            throw new BusinessException(ResultCode.UN_AUTHORIZED, "禁止重置自身用户名");
+        }
+        boolean targetIsSuper = userService.isSuperAdmin(id);
+        boolean operatorIsSuper = userService.isSuperAdmin(operatorId);
+        if (targetIsSuper && !operatorIsSuper) {
+            throw new BusinessException(ResultCode.UN_AUTHORIZED, "无权操作超级管理员账号");
+        }
+        userService.resetUsername(id);
+        return R.success(null, "用户名已重置为 yuna#CensoredWordName");
+    }
+
+    /**
      * 分配角色
      */
     @PostMapping("/{userId}/roles")

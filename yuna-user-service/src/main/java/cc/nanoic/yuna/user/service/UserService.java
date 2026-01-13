@@ -83,27 +83,31 @@ public interface UserService extends IService<User> {
 
     /**
      * 修改密码
-     * @param userId 用户ID
+     * 
+     * @param userId            用户ID
      * @param changePasswordDTO 密码修改信息
      */
     void changePassword(Long userId, UserChangePasswordDTO changePasswordDTO);
 
     /**
      * 修改邮箱
-     * @param userId 用户ID
+     * 
+     * @param userId         用户ID
      * @param changeEmailDTO 邮箱修改信息
      */
     void changeEmail(Long userId, UserChangeEmailDTO changeEmailDTO);
 
     /**
      * 分配角色
-     * @param userId 用户ID
+     * 
+     * @param userId  用户ID
      * @param roleIds 角色ID列表
      */
     void assignRoles(Long userId, List<Long> roleIds);
 
     /**
      * 获取用户角色
+     * 
      * @param userId 用户ID
      * @return 角色列表
      */
@@ -111,6 +115,7 @@ public interface UserService extends IService<User> {
 
     /**
      * 获取用户权限
+     * 
      * @param userId 用户ID
      * @return 权限列表
      */
@@ -118,13 +123,15 @@ public interface UserService extends IService<User> {
 
     /**
      * 分配权限（特殊权限）
-     * @param userId 用户ID
+     * 
+     * @param userId        用户ID
      * @param permissionIds 权限ID列表
      */
     void assignPermissions(Long userId, List<Long> permissionIds);
 
     /**
      * 更新用户账号状态
+     * 
      * @param userId 用户ID
      * @param status 状态(0:注销,1:正常,2:封禁)
      */
@@ -132,8 +139,23 @@ public interface UserService extends IService<User> {
 
     /**
      * 判断用户是否为超级管理员
+     * 
      * @param userId 用户ID
      * @return 是否为超级管理员
      */
     boolean isSuperAdmin(Long userId);
+
+    /**
+     * 批量删除用户
+     * 
+     * @param userIds 用户ID列表
+     */
+    void deleteUsers(List<Long> userIds);
+
+    /**
+     * 管理员重置用户名
+     * 
+     * @param userId 用户ID
+     */
+    void resetUsername(Long userId);
 }
