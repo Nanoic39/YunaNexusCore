@@ -3,10 +3,20 @@ package cc.nanoic.yuna.user.service.impl;
 import cc.nanoic.yuna.common.core.exception.BusinessException;
 import cc.nanoic.yuna.common.security.utils.JwtUtil;
 import cc.nanoic.yuna.common.core.result.ResultCode;
+import cc.nanoic.yuna.user.entity.Permission;
+import cc.nanoic.yuna.user.entity.Role;
+import cc.nanoic.yuna.user.entity.RolePermission;
 import cc.nanoic.yuna.user.entity.User;
 import cc.nanoic.yuna.user.entity.UserInfo;
+import cc.nanoic.yuna.user.entity.UserPermission;
+import cc.nanoic.yuna.user.entity.UserRole;
+import cc.nanoic.yuna.user.mapper.PermissionMapper;
+import cc.nanoic.yuna.user.mapper.RoleMapper;
+import cc.nanoic.yuna.user.mapper.RolePermissionMapper;
 import cc.nanoic.yuna.user.mapper.UserInfoMapper;
 import cc.nanoic.yuna.user.mapper.UserMapper;
+import cc.nanoic.yuna.user.mapper.UserPermissionMapper;
+import cc.nanoic.yuna.user.mapper.UserRoleMapper;
 import cc.nanoic.yuna.user.model.dto.UserChangeEmailDTO;
 import cc.nanoic.yuna.user.model.dto.UserChangePasswordDTO;
 import cc.nanoic.yuna.user.model.dto.UserCodeLoginDTO;
@@ -14,6 +24,8 @@ import cc.nanoic.yuna.user.model.dto.UserDetailDTO;
 import cc.nanoic.yuna.user.model.dto.UserLoginDTO;
 import cc.nanoic.yuna.user.model.dto.UserRegisterDTO;
 import cc.nanoic.yuna.user.model.dto.UserUpdateDTO;
+import cc.nanoic.yuna.user.model.vo.PermissionVO;
+import cc.nanoic.yuna.user.model.vo.RoleVO;
 import cc.nanoic.yuna.user.model.vo.UserInfoVO;
 import cc.nanoic.yuna.user.model.vo.UserLoginVO;
 import cc.nanoic.yuna.user.service.AuthService;
@@ -24,10 +36,16 @@ import cn.hutool.crypto.digest.BCrypt;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -37,6 +55,11 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     private final UserInfoMapper userInfoMapper;
     private final AuthService authService;
     private final JwtUtil jwtUtil;
+    private final RoleMapper roleMapper;
+    private final PermissionMapper permissionMapper;
+    private final UserRoleMapper userRoleMapper;
+    private final UserPermissionMapper userPermissionMapper;
+    private final RolePermissionMapper rolePermissionMapper;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -116,7 +139,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
 
             // 检查状态
             if (user.getStatus() != 1) {
-                throw new BusinessException(ResultCode.FAILURE, "账号已被禁用或注销");
+                throw new BusinessException(ResultCode.FAILURE, "账号已被禁用或注销，如需恢复请前往 /appeal 提交申诉");
             }
         }
 
@@ -145,7 +168,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         // 查询用户信息 (确保用户还存在且未被禁用)
         User user = baseMapper.selectById(userId);
         if (user == null || user.getStatus() != 1) {
-            throw new BusinessException(ResultCode.USER_NOT_EXIST, "用户不存在或已被禁用");
+            throw new BusinessException(ResultCode.USER_NOT_EXIST, "用户不存在或已被禁用，如需恢复请前往 /appeal 提交申诉");
         }
 
         // 查询用户详细信息 (包含UserInfo)
@@ -213,7 +236,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     public UserDetailDTO getUserDetail(Long userId) {
         User user = baseMapper.selectById(userId);
         if (user == null || user.getStatus() != 1) {
-            throw new BusinessException(ResultCode.USER_NOT_EXIST, "用户不存在或已被禁用");
+            throw new BusinessException(ResultCode.USER_NOT_EXIST, "用户不存在或已被禁用，如需恢复请前往 /appeal 提交申诉");
         }
         return baseMapper.selectUserDetailByUsername(user.getUsername());
     }
@@ -294,6 +317,103 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         updateById(user);
     }
 
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void assignRoles(Long userId, List<Long> roleIds) {
+        userRoleMapper.delete(new LambdaQueryWrapper<UserRole>().eq(UserRole::getUserId, userId));
+
+        if (roleIds != null && !roleIds.isEmpty()) {
+            roleIds.forEach(roleId -> {
+                UserRole ur = new UserRole();
+                ur.setUserId(userId);
+                ur.setRoleId(roleId);
+                ur.setCreatedAt(LocalDateTime.now());
+                userRoleMapper.insert(ur);
+            });
+        }
+    }
+
+    @Override
+    public List<RoleVO> getUserRoles(Long userId) {
+        List<UserRole> userRoles = userRoleMapper.selectList(new LambdaQueryWrapper<UserRole>().eq(UserRole::getUserId, userId));
+        if (userRoles.isEmpty()) {
+            return new ArrayList<>();
+        }
+        List<Long> roleIds = userRoles.stream().map(UserRole::getRoleId).collect(Collectors.toList());
+        List<Role> roles = roleMapper.selectBatchIds(roleIds);
+        return roles.stream().map(role -> {
+            RoleVO vo = new RoleVO();
+            BeanUtils.copyProperties(role, vo);
+            return vo;
+        }).collect(Collectors.toList());
+    }
+
+    @Override
+    public List<PermissionVO> getUserPermissions(Long userId) {
+        Set<Long> permissionIds = new HashSet<>();
+
+        List<UserPermission> userPermissions = userPermissionMapper.selectList(new LambdaQueryWrapper<UserPermission>().eq(UserPermission::getUserId, userId));
+        permissionIds.addAll(userPermissions.stream().map(UserPermission::getPermissionId).collect(Collectors.toList()));
+
+        List<UserRole> userRoles = userRoleMapper.selectList(new LambdaQueryWrapper<UserRole>().eq(UserRole::getUserId, userId));
+        if (!userRoles.isEmpty()) {
+            List<Long> roleIds = userRoles.stream().map(UserRole::getRoleId).collect(Collectors.toList());
+            List<Role> roles = roleMapper.selectBatchIds(roleIds);
+            boolean isSuperAdmin = roles.stream().anyMatch(r -> "super_admin".equals(r.getRoleCode()));
+            if (isSuperAdmin) {
+                PermissionVO wildcard = new PermissionVO();
+                wildcard.setPermCode("*:*:*");
+                wildcard.setPermName("全部权限");
+                wildcard.setResourceType(3);
+                List<PermissionVO> list = new ArrayList<>();
+                list.add(wildcard);
+                return list;
+            }
+            List<RolePermission> rolePermissions = rolePermissionMapper.selectList(new LambdaQueryWrapper<RolePermission>().in(RolePermission::getRoleId, roleIds));
+            permissionIds.addAll(rolePermissions.stream().map(RolePermission::getPermissionId).collect(Collectors.toList()));
+        }
+
+        if (permissionIds.isEmpty()) {
+            return new ArrayList<>();
+        }
+
+        List<Permission> permissions = permissionMapper.selectBatchIds(permissionIds);
+        return permissions.stream().map(p -> {
+            PermissionVO vo = new PermissionVO();
+            BeanUtils.copyProperties(p, vo);
+            return vo;
+        }).collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void assignPermissions(Long userId, List<Long> permissionIds) {
+        userPermissionMapper.delete(new LambdaQueryWrapper<UserPermission>().eq(UserPermission::getUserId, userId));
+
+        if (permissionIds != null && !permissionIds.isEmpty()) {
+            permissionIds.forEach(permId -> {
+                UserPermission up = new UserPermission();
+                up.setUserId(userId);
+                up.setPermissionId(permId);
+                up.setCreatedAt(LocalDateTime.now());
+                userPermissionMapper.insert(up);
+            });
+        }
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void updateStatus(Long userId, Integer status) {
+        User user = getById(userId);
+        if (user == null) {
+            throw new BusinessException(ResultCode.USER_NOT_EXIST, "用户不存在");
+        }
+        if (status == null || (status != 0 && status != 1 && status != 2)) {
+            throw new BusinessException(ResultCode.FAILURE, "状态值非法");
+        }
+        user.setStatus(status);
+        updateById(user);
+    }
     // ========== 方法 ========== //
 
     /**
@@ -305,6 +425,16 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     @Override
     public boolean checkEmail(String email) {
         return count(new LambdaQueryWrapper<User>().eq(User::getEmail, email)) > 0;
+    }
+
+    @Override
+    public boolean isSuperAdmin(Long userId) {
+        List<UserRole> userRoles = userRoleMapper.selectList(new LambdaQueryWrapper<UserRole>().eq(UserRole::getUserId, userId));
+        if (userRoles == null || userRoles.isEmpty()) return false;
+        List<Long> roleIds = userRoles.stream().map(UserRole::getRoleId).collect(Collectors.toList());
+        if (roleIds.isEmpty()) return false;
+        List<Role> roles = roleMapper.selectBatchIds(roleIds);
+        return roles.stream().anyMatch(r -> "super_admin".equals(r.getRoleCode()));
     }
 
     /**

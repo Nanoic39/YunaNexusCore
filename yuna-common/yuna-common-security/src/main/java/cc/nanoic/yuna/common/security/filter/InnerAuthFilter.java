@@ -12,6 +12,7 @@ import org.springframework.stereotype.Component;
 import cc.nanoic.yuna.common.core.constant.SecurityConstants;
 import cc.nanoic.yuna.common.core.context.SecurityContextHolder;
 import cc.nanoic.yuna.common.security.config.JwtProperties;
+import cc.nanoic.yuna.common.security.service.SecurityPermissionService;
 import cc.nanoic.yuna.common.security.utils.JwtUtil;
 import cn.hutool.core.util.StrUtil;
 import jakarta.servlet.Filter;
@@ -20,7 +21,9 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.ServletRequest;
 import jakarta.servlet.ServletResponse;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 
 @Component
 @RequiredArgsConstructor
@@ -29,6 +32,9 @@ public class InnerAuthFilter implements Filter {
 
     private final JwtUtil jwtUtil;
     private final JwtProperties jwtProperties;
+    
+    @Autowired(required = false)
+    private SecurityPermissionService securityPermissionService;
 
     @Override
     public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
@@ -46,7 +52,10 @@ public class InnerAuthFilter implements Filter {
             if (StrUtil.isNotBlank(username)) {
                 loginUser.setUsername(URLDecoder.decode(username, StandardCharsets.UTF_8));
             }
-            // TODO: 解析角色权限（待完善）
+            // 加载权限
+            if (securityPermissionService != null) {
+                loginUser.setPermissions(securityPermissionService.getPermissions(loginUser.getUserId()));
+            }
             SecurityContextHolder.set(loginUser);
         } else { // 没有网关Header，尝试直接解析 JWT
             String token = httpRequest.getHeader(jwtProperties.getTokenHeader());
@@ -60,9 +69,26 @@ public class InnerAuthFilter implements Filter {
                     SecurityContextHolder.LoginUser loginUser = new SecurityContextHolder.LoginUser();
                     loginUser.setUserId(userIdFromToken);
                     loginUser.setUsername(usernameFromToken);
-                    // TODO: 加载权限
-                    // loginUser.setPermissions(...);
+                    // 加载权限
+                    if (securityPermissionService != null) {
+                        loginUser.setPermissions(securityPermissionService.getPermissions(userIdFromToken));
+                    }
                     SecurityContextHolder.set(loginUser);
+                }
+            }
+        }
+
+        if (securityPermissionService != null) {
+            SecurityContextHolder.LoginUser lu = SecurityContextHolder.get();
+            if (lu != null && lu.getUserId() != null) {
+                boolean banned = securityPermissionService.isUserBanned(lu.getUserId());
+                String uri = httpRequest.getRequestURI();
+                boolean allowAppeal = uri != null && uri.contains("appeal");
+                if (banned && !allowAppeal) {
+                    HttpServletResponse httpResponse = (HttpServletResponse) response;
+                    httpResponse.sendError(HttpServletResponse.SC_FORBIDDEN, "账号已被封禁，请通过申诉渠道解决");
+                    SecurityContextHolder.remove();
+                    return;
                 }
             }
         }

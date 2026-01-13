@@ -8,7 +8,12 @@ import cc.nanoic.yuna.user.model.dto.UserLoginDTO;
 import cc.nanoic.yuna.user.model.dto.UserRegisterDTO;
 import cc.nanoic.yuna.user.model.dto.UserDetailDTO;
 import cc.nanoic.yuna.user.model.dto.UserUpdateDTO;
+import cc.nanoic.yuna.user.model.vo.PermissionVO;
+import cc.nanoic.yuna.user.model.vo.RoleVO;
 import cc.nanoic.yuna.user.model.vo.UserLoginVO;
+
+import java.util.List;
+
 import com.baomidou.mybatisplus.extension.service.IService;
 
 public interface UserService extends IService<User> {
@@ -89,4 +94,46 @@ public interface UserService extends IService<User> {
      * @param changeEmailDTO 邮箱修改信息
      */
     void changeEmail(Long userId, UserChangeEmailDTO changeEmailDTO);
+
+    /**
+     * 分配角色
+     * @param userId 用户ID
+     * @param roleIds 角色ID列表
+     */
+    void assignRoles(Long userId, List<Long> roleIds);
+
+    /**
+     * 获取用户角色
+     * @param userId 用户ID
+     * @return 角色列表
+     */
+    List<RoleVO> getUserRoles(Long userId);
+
+    /**
+     * 获取用户权限
+     * @param userId 用户ID
+     * @return 权限列表
+     */
+    List<PermissionVO> getUserPermissions(Long userId);
+
+    /**
+     * 分配权限（特殊权限）
+     * @param userId 用户ID
+     * @param permissionIds 权限ID列表
+     */
+    void assignPermissions(Long userId, List<Long> permissionIds);
+
+    /**
+     * 更新用户账号状态
+     * @param userId 用户ID
+     * @param status 状态(0:注销,1:正常,2:封禁)
+     */
+    void updateStatus(Long userId, Integer status);
+
+    /**
+     * 判断用户是否为超级管理员
+     * @param userId 用户ID
+     * @return 是否为超级管理员
+     */
+    boolean isSuperAdmin(Long userId);
 }
