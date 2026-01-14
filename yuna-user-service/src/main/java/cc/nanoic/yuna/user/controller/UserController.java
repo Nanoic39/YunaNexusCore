@@ -55,7 +55,8 @@ public class UserController {
      * @return 用户个人信息
      */
     @GetMapping("/profile")
-    public R<UserDetailDTO> getUserProfile(@RequestHeader(SecurityConstants.DETAILS_USER_ID) Long userId,
+    public R<UserDetailDTO> getUserProfile(
+            @RequestHeader(value = SecurityConstants.DETAILS_USER_ID, required = false) Long userId,
             @RequestParam(value = "uuid", required = false) String uuid) {
         // 如果传了uuid，获取指定用户的信息；否则获取当前登录用户的信息
         // 如果没有透传 userId (未登录) 且没有传 uuid -> 报错
@@ -155,7 +156,8 @@ public class UserController {
             @RequestParam(value = "type", required = false) Integer type,
             @RequestParam(value = "range", required = false) Integer range,
             @RequestParam(value = "service", required = false) String service,
-            @RequestParam(value = "reason", required = false) String reason) {
+            @RequestParam(value = "reason") String reason,
+            @RequestParam(value = "endTime", required = false) Long endTime) {
         if (operatorId != null && operatorId.equals(id)) {
             throw new BusinessException(ResultCode.UN_AUTHORIZED, "禁止对自己执行封禁操作");
         }
@@ -165,7 +167,12 @@ public class UserController {
             throw new BusinessException(ResultCode.UN_AUTHORIZED, "无权操作超级管理员账号");
         }
         userService.updateStatus(id, 2);
-        banRecordService.recordBan(id, operatorId, type, range, service, reason);
+        java.time.LocalDateTime endTimeLdt = null;
+        if (endTime != null && endTime > 0) {
+            endTimeLdt = java.time.Instant.ofEpochMilli(endTime).atZone(java.time.ZoneId.systemDefault())
+                    .toLocalDateTime();
+        }
+        banRecordService.recordBan(id, operatorId, type, range, service, reason, endTimeLdt);
         return R.success(null, "封禁成功");
     }
 
@@ -211,9 +218,19 @@ public class UserController {
     @PostMapping("/ban/batch")
     @RequiresPermissions("sys:user:ban")
     public R<Void> banUsersBatch(@RequestHeader(SecurityConstants.DETAILS_USER_ID) Long operatorId,
-            @RequestBody List<Long> ids) {
+            @RequestBody List<Long> ids,
+            @RequestParam(value = "type", required = false) Integer type,
+            @RequestParam(value = "range", required = false) Integer range,
+            @RequestParam(value = "service", required = false) String service,
+            @RequestParam(value = "reason") String reason,
+            @RequestParam(value = "endTime", required = false) Long endTime) {
         if (ids == null || ids.isEmpty()) {
             throw new BusinessException(ResultCode.FAILURE, "未选择任何用户");
+        }
+        java.time.LocalDateTime endTimeLdt = null;
+        if (endTime != null && endTime > 0) {
+            endTimeLdt = java.time.Instant.ofEpochMilli(endTime).atZone(java.time.ZoneId.systemDefault())
+                    .toLocalDateTime();
         }
         for (Long id : ids) {
             if (operatorId != null && operatorId.equals(id)) {
@@ -225,7 +242,7 @@ public class UserController {
                 continue;
             }
             userService.updateStatus(id, 2);
-            banRecordService.recordBan(id, operatorId, null, null, null, "批量封禁");
+            banRecordService.recordBan(id, operatorId, type, range, service, reason, endTimeLdt);
         }
         return R.success(null, "批量封禁完成");
     }
@@ -299,6 +316,25 @@ public class UserController {
     }
 
     /**
+     * 管理员重置昵称
+     */
+    @PostMapping("/{id}/nickname/reset")
+    @RequiresPermissions("sys:user:update")
+    public R<Void> resetNickname(@RequestHeader(SecurityConstants.DETAILS_USER_ID) Long operatorId,
+            @PathVariable("id") Long id) {
+        if (operatorId != null && operatorId.equals(id)) {
+            throw new BusinessException(ResultCode.UN_AUTHORIZED, "禁止重置自身昵称");
+        }
+        boolean targetIsSuper = userService.isSuperAdmin(id);
+        boolean operatorIsSuper = userService.isSuperAdmin(operatorId);
+        if (targetIsSuper && !operatorIsSuper) {
+            throw new BusinessException(ResultCode.UN_AUTHORIZED, "无权操作超级管理员账号");
+        }
+        userService.resetNickname(id);
+        return R.success(null, "昵称已重置为 yuna#CensoredWordName");
+    }
+
+    /**
      * 分配角色
      */
     @PostMapping("/{userId}/roles")
@@ -333,6 +369,12 @@ public class UserController {
     @RequiresPermissions("sys:user:list")
     public R<UserDetailDTO> getUserDetailById(@PathVariable("id") Long id) {
         return R.success(userService.getUserDetail(id));
+    }
+
+    @GetMapping("/admin/profile/by-uuid")
+    @RequiresPermissions("sys:user:list")
+    public R<UserDetailDTO> getUserProfileByUuidForAdmin(@RequestParam("uuid") String uuid) {
+        return R.success(userService.getUserDetailByUuidIncludeDisabled(uuid));
     }
 
     /**

@@ -32,26 +32,25 @@ public class AppealController {
     @PostMapping
     public R<Void> submit(@RequestHeader(value = SecurityConstants.DETAILS_USER_ID, required = false) Long userId,
             @RequestBody AppealSubmitDTO dto) {
-        appealService.submit(userId, dto.getContact(), dto.getReason());
+        appealService.submit(userId, dto.getAccount(), dto.getReason());
         return R.success(null, "申诉提交成功，我们将尽快处理");
     }
 
     @GetMapping("/query")
     public R<List<cc.nanoic.yuna.user.model.vo.AppealQueryVO>> query(
-            @RequestParam(value = "contact", required = false) String contact,
             @RequestParam(value = "account", required = false) String account) {
-        Long userId = null;
-        UserDetailDTO matchedUser = null;
-        if (account != null && !account.isEmpty()) {
-            matchedUser = account.contains("@")
-                    ? userMapper.selectUserDetailByEmail(account)
-                    : userMapper.selectUserDetailByUsername(account);
-            if (matchedUser != null) {
-                userId = matchedUser.getId();
-            }
+        if (account == null || account.isBlank()) {
+            return R.success(java.util.Collections.emptyList(), "查询结果为空");
         }
+        Long userId = null;
+        UserDetailDTO matchedUser = account.contains("@")
+                ? userMapper.selectUserDetailByEmail(account)
+                : userMapper.selectUserDetailByUsername(account);
+        if (matchedUser == null) {
+            return R.success(java.util.Collections.emptyList(), "无对应异常账号");
+        }
+        userId = matchedUser.getId();
         LambdaQueryWrapper<Appeal> qw = new LambdaQueryWrapper<Appeal>()
-                .eq(contact != null && !contact.isEmpty(), Appeal::getContact, contact)
                 .eq(userId != null, Appeal::getUserId, userId)
                 .orderByDesc(Appeal::getCreateTime);
         List<Appeal> list = appealMapper.selectList(qw);
@@ -81,6 +80,9 @@ public class AppealController {
                 vo.setUserExist(false);
             }
             voList.add(vo);
+        }
+        if (voList.isEmpty()) {
+            return R.success(voList, "查询结果为空");
         }
         return R.success(voList);
     }

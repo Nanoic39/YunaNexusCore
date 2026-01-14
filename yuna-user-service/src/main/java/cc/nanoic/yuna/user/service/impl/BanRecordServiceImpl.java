@@ -16,24 +16,26 @@ import java.util.List;
 public class BanRecordServiceImpl extends ServiceImpl<BanRecordMapper, BanRecord> implements BanRecordService {
 
     @Override
-    public void recordBan(Long userId, Long operatorId, Integer type, Integer range, String service, String reason) {
+    public void recordBan(Long userId, Long operatorId, Integer type, Integer range, String service, String reason,
+            LocalDateTime endTime) {
         BanRecord br = new BanRecord();
         br.setUserId(userId);
         br.setBanType(type == null ? 2 : type);
         br.setBanRange(range == null ? 1 : range);
         br.setBanService(service);
-        br.setBanReason(reason == null ? "系统封禁" : reason);
+        br.setBanReason(reason);
         br.setBanOperatorId(operatorId);
         br.setStartTime(LocalDateTime.now());
+        br.setEndTime(endTime);
         this.save(br);
     }
 
     @Override
     public void closeOpenBans(Long userId, Long operatorId) {
+        LocalDateTime now = LocalDateTime.now();
         List<BanRecord> opens = this.list(new LambdaQueryWrapper<BanRecord>()
                 .eq(BanRecord::getUserId, userId)
-                .isNull(BanRecord::getEndTime));
-        LocalDateTime now = LocalDateTime.now();
+                .and(w -> w.isNull(BanRecord::getEndTime).or().gt(BanRecord::getEndTime, now)));
         for (BanRecord br : opens) {
             br.setEndTime(now);
             br.setUnbanOperatorId(operatorId);

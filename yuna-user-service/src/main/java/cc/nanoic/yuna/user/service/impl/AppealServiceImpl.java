@@ -4,6 +4,8 @@ import cc.nanoic.yuna.common.core.exception.BusinessException;
 import cc.nanoic.yuna.common.core.result.ResultCode;
 import cc.nanoic.yuna.user.entity.Appeal;
 import cc.nanoic.yuna.user.mapper.AppealMapper;
+import cc.nanoic.yuna.user.mapper.UserMapper;
+import cc.nanoic.yuna.user.model.dto.UserDetailDTO;
 import cc.nanoic.yuna.user.service.AppealService;
 import cc.nanoic.yuna.user.service.BanRecordService;
 import cc.nanoic.yuna.user.service.UserService;
@@ -24,18 +26,28 @@ public class AppealServiceImpl implements AppealService {
     private final StringRedisTemplate redisTemplate;
     private final UserService userService;
     private final BanRecordService banRecordService;
+    private final UserMapper userMapper;
 
     @Override
-    public void submit(Long userId, String contact, String reason) {
+    public void submit(Long userId, String account, String reason) {
         Long uid = userId;
-        if (uid == null) {
-            // 未登录用户允许提交，但做联系方式必须
-            if (contact == null || contact.isBlank()) {
-                throw new BusinessException(ResultCode.FAILURE, "请提供联系方式以便处理申诉");
+        Long targetUserId = uid;
+        if (targetUserId == null) {
+            if (account == null || account.isBlank()) {
+                throw new BusinessException(ResultCode.FAILURE, "无对应异常账号");
             }
+            UserDetailDTO matchedUser = account.contains("@")
+                    ? userMapper.selectUserDetailByEmail(account)
+                    : userMapper.selectUserDetailByUsername(account);
+            if (matchedUser == null) {
+                throw new BusinessException(ResultCode.FAILURE, "无对应异常账号");
+            }
+            if (matchedUser.getStatus() == null || matchedUser.getStatus() != 2) {
+                throw new BusinessException(ResultCode.FAILURE, "该账号未封禁，无需申诉");
+            }
+            targetUserId = matchedUser.getId();
         }
         // 防重复：存在未处理或处理中申诉则拒绝
-        Long targetUserId = uid;
         Appeal existing = appealMapper.selectOne(new LambdaQueryWrapper<Appeal>()
                 .eq(targetUserId != null, Appeal::getUserId, targetUserId)
                 .in(Appeal::getStatus, 0, 1)
@@ -46,7 +58,7 @@ public class AppealServiceImpl implements AppealService {
         }
         Appeal a = new Appeal();
         a.setUserId(targetUserId);
-        a.setContact(contact);
+        a.setContact(account);
         a.setReason(reason);
         a.setStatus(0);
         a.setCreateTime(LocalDateTime.now());

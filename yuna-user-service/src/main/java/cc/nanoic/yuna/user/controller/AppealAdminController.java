@@ -6,6 +6,7 @@ import cc.nanoic.yuna.common.security.annotation.RequiresPermissions;
 import cc.nanoic.yuna.user.entity.Appeal;
 import cc.nanoic.yuna.user.mapper.AppealMapper;
 import cc.nanoic.yuna.user.service.AppealService;
+import cc.nanoic.yuna.user.mapper.UserMapper;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
@@ -18,10 +19,12 @@ public class AppealAdminController {
 
     private final AppealMapper appealMapper;
     private final AppealService appealService;
+    private final UserMapper userMapper;
 
     @GetMapping("/list")
     @RequiresPermissions("sys:appeal:list")
-    public R<Page<Appeal>> list(@RequestParam(value = "page", defaultValue = "1") Integer page,
+    public R<Page<cc.nanoic.yuna.user.model.vo.AppealQueryVO>> list(
+            @RequestParam(value = "page", defaultValue = "1") Integer page,
             @RequestParam(value = "size", defaultValue = "10") Integer size,
             @RequestParam(value = "status", required = false) Integer status,
             @RequestParam(value = "keyword", required = false) String keyword) {
@@ -32,7 +35,45 @@ public class AppealAdminController {
                         .like(Appeal::getContact, keyword)
                         .or().like(Appeal::getReason, keyword))
                 .orderByDesc(Appeal::getCreateTime);
-        return R.success(appealMapper.selectPage(p, qw));
+        Page<Appeal> result = appealMapper.selectPage(p, qw);
+        Page<cc.nanoic.yuna.user.model.vo.AppealQueryVO> voPage = new Page<>(result.getCurrent(), result.getSize(),
+                result.getTotal());
+        java.util.List<cc.nanoic.yuna.user.model.vo.AppealQueryVO> voList = new java.util.ArrayList<>();
+        for (Appeal a : result.getRecords()) {
+            cc.nanoic.yuna.user.model.vo.AppealQueryVO vo = new cc.nanoic.yuna.user.model.vo.AppealQueryVO();
+            vo.setId(a.getId());
+            vo.setContact(a.getContact());
+            vo.setReason(a.getReason());
+            vo.setStatus(a.getStatus());
+            vo.setOperatorId(a.getOperatorId());
+            vo.setProcessRemark(a.getProcessRemark());
+            vo.setCreateTime(a.getCreateTime());
+            vo.setUpdateTime(a.getUpdateTime());
+            if (a.getUserId() != null) {
+                cc.nanoic.yuna.user.entity.User userEntity = userMapper.selectById(a.getUserId());
+                if (userEntity != null) {
+                    vo.setUuid(userEntity.getUuid());
+                    vo.setUserExist(true);
+                } else {
+                    vo.setUserExist(false);
+                }
+            } else if (a.getContact() != null && !a.getContact().isEmpty()) {
+                cc.nanoic.yuna.user.model.dto.UserDetailDTO matchedUser = a.getContact().contains("@")
+                        ? userMapper.selectUserDetailByEmail(a.getContact())
+                        : userMapper.selectUserDetailByUsername(a.getContact());
+                if (matchedUser != null) {
+                    vo.setUuid(matchedUser.getUuid());
+                    vo.setUserExist(true);
+                } else {
+                    vo.setUserExist(false);
+                }
+            } else {
+                vo.setUserExist(false);
+            }
+            voList.add(vo);
+        }
+        voPage.setRecords(voList);
+        return R.success(voPage);
     }
 
     @PostMapping("/{id}/claim")

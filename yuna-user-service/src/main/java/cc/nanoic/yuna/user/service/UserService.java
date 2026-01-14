@@ -158,4 +158,13 @@ public interface UserService extends IService<User> {
      * @param userId 用户ID
      */
     void resetUsername(Long userId);
+
+    /**
+     * 管理员重置昵称
+     * 
+     * @param userId 用户ID
+     */
+    void resetNickname(Long userId);
+
+    UserDetailDTO getUserDetailByUuidIncludeDisabled(String uuid);
 }

@@ -4,7 +4,6 @@ import lombok.Data;
 
 @Data
 public class AppealSubmitDTO {
-    private String contact;
+    private String account;
     private String reason;
 }
-

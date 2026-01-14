@@ -1,7 +1,7 @@
 package cc.nanoic.yuna.user.service;
 
 public interface AppealService {
-    void submit(Long userId, String contact, String reason);
+    void submit(Long userId, String account, String reason);
 
     void claim(Long appealId, Long operatorId);
 

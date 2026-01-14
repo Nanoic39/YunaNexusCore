@@ -262,6 +262,15 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         return user.getId();
     }
 
+    @Override
+    public UserDetailDTO getUserDetailByUuidIncludeDisabled(String uuid) {
+        User user = baseMapper.selectOne(new LambdaQueryWrapper<User>().eq(User::getUuid, uuid));
+        if (user == null) {
+            throw new BusinessException(ResultCode.USER_NOT_EXIST, "用户不存在");
+        }
+        return baseMapper.selectUserDetailByUsername(user.getUsername());
+    }
+
     /**
      * 修改密码
      * 
@@ -386,15 +395,27 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         }
 
         if (permissionIds.isEmpty()) {
-            return new ArrayList<>();
+            List<PermissionVO> baseList = new ArrayList<>();
+            PermissionVO base = new PermissionVO();
+            base.setPermCode("menu:file:*");
+            base.setPermName("文件管理菜单总权限");
+            base.setResourceType(3);
+            baseList.add(base);
+            return baseList;
         }
 
         List<Permission> permissions = permissionMapper.selectBatchIds(permissionIds);
-        return permissions.stream().map(p -> {
+        List<PermissionVO> list = permissions.stream().map(p -> {
             PermissionVO vo = new PermissionVO();
             BeanUtils.copyProperties(p, vo);
             return vo;
         }).collect(Collectors.toList());
+        PermissionVO base = new PermissionVO();
+        base.setPermCode("menu:file:*");
+        base.setPermName("文件管理菜单总权限");
+        base.setResourceType(3);
+        list.add(base);
+        return list;
     }
 
     @Override
@@ -450,6 +471,18 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         }
         user.setUsername("yuna#CensoredWordName");
         updateById(user);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void resetNickname(Long userId) {
+        UserInfo userInfo = userInfoMapper.selectById(userId);
+        if (userInfo == null) {
+            throw new BusinessException(ResultCode.USER_NOT_EXIST, "用户不存在或用户信息缺失");
+        }
+        userInfo.setNickname("yuna#CensoredWordName");
+        userInfo.setUpdateTime(LocalDateTime.now());
+        userInfoMapper.updateById(userInfo);
     }
     // ========== 方法 ========== //
 
@@ -512,18 +545,26 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
 
         baseMapper.insert(user);
 
-        // 创建UserInfo对象
         UserInfo userInfo = new UserInfo();
         userInfo.setUserId(user.getId());
-        // 未填写昵称时设置为默认格式：Yuna#default_用户名
         userInfo.setNickname(StrUtil.isBlank(registerDTO.getNickname())
                 ? ("Yuna#default_" + registerDTO.getUsername())
                 : registerDTO.getNickname());
-        userInfo.setGender(registerDTO.getGender() != null ? registerDTO.getGender() : 0); // 默认0:未知
-        userInfo.setExperience(0); // 注册时默认零
+        userInfo.setGender(registerDTO.getGender() != null ? registerDTO.getGender() : 0);
+        userInfo.setExperience(0);
         userInfo.setUpdateTime(LocalDateTime.now());
 
         userInfoMapper.insert(userInfo);
+
+        Role defaultRole = roleMapper
+                .selectOne(new LambdaQueryWrapper<Role>().eq(Role::getRoleCode, "user"));
+        if (defaultRole != null) {
+            UserRole ur = new UserRole();
+            ur.setUserId(user.getId());
+            ur.setRoleId(defaultRole.getId());
+            ur.setCreatedAt(LocalDateTime.now());
+            userRoleMapper.insert(ur);
+        }
 
         return user.getId();
     }
