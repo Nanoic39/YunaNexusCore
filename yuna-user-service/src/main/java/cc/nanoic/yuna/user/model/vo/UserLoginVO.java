@@ -2,6 +2,7 @@ package cc.nanoic.yuna.user.model.vo;
 
 import lombok.Builder;
 import lombok.Data;
+import java.util.List;
 
 @Data
 @Builder
@@ -30,6 +31,11 @@ public class UserLoginVO {
      * Token刷新令牌
      */
     private String refreshToken;
+
+    /**
+     * 用户角色列表
+     */
+    private List<RoleVO> roles;
 
     /**
      * 用户信息, 包含用户的基本信息

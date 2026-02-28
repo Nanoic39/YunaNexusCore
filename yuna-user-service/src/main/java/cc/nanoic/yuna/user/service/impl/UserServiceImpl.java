@@ -597,6 +597,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
                 .email(user.getEmail())
                 .token(accessToken)
                 .refreshToken(refreshToken)
+                .roles(getUserRoles(user.getId()))
                 .userInfo(userInfoVO)
                 .build();
     }

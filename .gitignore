@@ -38,3 +38,4 @@ build/
 init/
 
 yuna-file-service/data/files
+/data/files
