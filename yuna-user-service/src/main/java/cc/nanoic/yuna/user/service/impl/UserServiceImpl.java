@@ -51,6 +51,8 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements UserService {
 
+    private static final String DEFAULT_ROLE_CODE = "user";
+
     // 导入
     private final UserInfoMapper userInfoMapper;
     private final AuthService authService;
@@ -395,27 +397,15 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         }
 
         if (permissionIds.isEmpty()) {
-            List<PermissionVO> baseList = new ArrayList<>();
-            PermissionVO base = new PermissionVO();
-            base.setPermCode("menu:file:*");
-            base.setPermName("文件管理菜单总权限");
-            base.setResourceType(3);
-            baseList.add(base);
-            return baseList;
+            return new ArrayList<>();
         }
 
         List<Permission> permissions = permissionMapper.selectBatchIds(permissionIds);
-        List<PermissionVO> list = permissions.stream().map(p -> {
+        return permissions.stream().map(p -> {
             PermissionVO vo = new PermissionVO();
             BeanUtils.copyProperties(p, vo);
             return vo;
         }).collect(Collectors.toList());
-        PermissionVO base = new PermissionVO();
-        base.setPermCode("menu:file:*");
-        base.setPermName("文件管理菜单总权限");
-        base.setResourceType(3);
-        list.add(base);
-        return list;
     }
 
     @Override
@@ -557,7 +547,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         userInfoMapper.insert(userInfo);
 
         Role defaultRole = roleMapper
-                .selectOne(new LambdaQueryWrapper<Role>().eq(Role::getRoleCode, "user"));
+                .selectOne(new LambdaQueryWrapper<Role>().eq(Role::getRoleCode, DEFAULT_ROLE_CODE));
         if (defaultRole != null) {
             UserRole ur = new UserRole();
             ur.setUserId(user.getId());
@@ -589,7 +579,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
                 .nickname(userInfo.getNickname())
                 .avatar(StrUtil.isNotBlank(userInfo.getAvatarId())
                         ? "/file/download/" + userInfo.getAvatarId() + "?inline=true"
-                        : null) // TODO: 集成文件存储服务，自动拼接URL
+                        : null)
                 .gender(
                         // 自动转换为字符串
                         switch (userInfo.getGender()) {

@@ -81,7 +81,7 @@ public class ChunkController {
     @GetMapping("/config")
     public R<Map<String, Object>> config(@RequestHeader(SecurityConstants.DETAILS_USER_ID) Long userId) {
         Map<String, Object> config = new HashMap<>();
-        // TODO: 真正的权限判断。目前权限系统未完善，假设 ID 为 1 的用户是超级管理员
+        // TODO: 真正的权限判断。目前假设 ID 为 1 的用户是超级管理员
         boolean isAdmin = userId != null && userId == 1L;
         config.put("concurrency", isAdmin ? 200 : 50);
         config.put("chunkSize", 25 * 1024 * 1024); // 25MB

@@ -164,7 +164,7 @@ public class FileServiceImpl implements FileService {
         e.setFileSize(file.length());
         e.setFileType(fileType);
         e.setMimeType(mimeType);
-        e.setCategory(0); // TODO: detect category
+        e.setCategory(0); // TODO: 检测文件类别
         e.setIsFolder(0);
         e.setFileCount(0);
         e.setSubSize(0L);
